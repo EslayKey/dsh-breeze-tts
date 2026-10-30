@@ -8,6 +8,18 @@
 dsh plugin --profile desktop add @eslaykey/dsh-breeze-tts
 ```
 
+如果提示 `dsh : 无法将“dsh”项识别为 cmdlet…`，说明 CLI 不在 PATH 上。DSH 桌面版自带的 CLI 在：
+
+```
+D:\ds\resources\runtime\cli\bin\dsh.cmd
+```
+
+两条路任选：把 `D:\ds\resources\runtime\cli\bin` 加进用户 PATH（加完重开终端），或者直接用完整路径：
+
+```powershell
+& "D:\ds\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @eslaykey/dsh-breeze-tts
+```
+
 装完**重启 DSH**。然后进「设置 → 语音朗读」，在顶部填入 Breeze 的 API key（`brz_` 开头）点「连接」，成功会显示当前余额。
 
 API key 在这里申请：<https://breezeblue.ai/app/developer/api-keys>
