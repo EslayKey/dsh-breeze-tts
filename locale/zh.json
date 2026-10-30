@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "title": "Breeze 语音朗读",
+    "description": "用 Breeze Blue 把文字转成语音：给代理朗读工具，给界面音色设置、回复朗读和音色设计。"
+  },
+  "section": {
+    "title": "语音朗读",
+    "subtitle": "Breeze Blue · 文字转语音"
+  },
+  "label": {
+    "voice": "音色",
+    "mood": "情绪",
+    "previewText": "试听文案",
+    "dailyLimit": "每日字数上限",
+    "balance": "剩余额度",
+    "todayUsage": "今日已用",
+    "preview": "试听",
+    "save": "保存",
+    "saving": "保存中…",
+    "synthesizing": "合成中…",
+    "refresh": "刷新",
+    "designed": "自捏",
+    "readAloud": "朗读这条"
+  },
+  "status": {
+    "ready": "就绪",
+    "missingKey": "缺少 API key",
+    "credits": "credits",
+    "chars": "字"
+  },
+  "hint": {
+    "key": "把 Breeze API key 写进 ~/.dsh/breeze.json 的 apiKey 字段。",
+    "limit": "超过上限会拒绝合成，避免意外烧额度。"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "title": "Breeze Voice",
+    "description": "Text to speech with Breeze Blue: speak tools for the agent, voice settings, reply playback and voice design."
+  },
+  "section": {
+    "title": "Voice",
+    "subtitle": "Breeze Blue · whale-maid voice"
+  },
+  "label": {
+    "voice": "Voice",
+    "mood": "Mood",
+    "previewText": "Preview line",
+    "dailyLimit": "Daily character limit",
+    "balance": "Credits left",
+    "todayUsage": "Used today",
+    "preview": "Preview",
+    "save": "Save",
+    "saving": "Saving…",
+    "synthesizing": "Synthesizing…",
+    "refresh": "Refresh",
+    "designed": "Designed",
+    "readAloud": "Read aloud"
+  },
+  "status": {
+    "ready": "Ready",
+    "missingKey": "Missing API key",
+    "credits": "credits",
+    "chars": "chars"
+  },
+  "hint": {
+    "key": "Write the Breeze API key into apiKey of ~/.dsh/breeze.json.",
+    "limit": "Synthesis is refused past the limit so credits cannot run away."
+  }
+}

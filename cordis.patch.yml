@@ -1,0 +1,4 @@
+- insert:
+    - id: breeze-tts
+      name: '@eslaykey/dsh-breeze-tts'
+      config: {}
