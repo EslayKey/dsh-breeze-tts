@@ -45,5 +45,13 @@
     "text-to-speech",
     "breeze",
     "voice"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EslayKey/dsh-breeze-tts.git"
+  },
+  "homepage": "https://github.com/EslayKey/dsh-breeze-tts#readme",
+  "bugs": {
+    "url": "https://github.com/EslayKey/dsh-breeze-tts/issues"
+  }
 }
