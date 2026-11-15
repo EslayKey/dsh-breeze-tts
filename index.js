@@ -46,7 +46,7 @@ export const inject = ['tools', 'webServer']
 const inflight = new Map()
 const synthQueue = []
 let activeSynthCalls = 0
-const MAX_CONCURRENT_SYNTH = 2
+const MAX_CONCURRENT_SYNTH = 1
 
 function resolveToneInstructions(settings, toneId) {
   const custom = String((settings && settings.customMood) || '').trim()
@@ -106,12 +106,29 @@ async function readStore() {
   }
 }
 
+const storeQueue = []
+let storeBusy = false
+
+async function withStoreLock(task) {
+  if (storeBusy) await new Promise((resolve) => storeQueue.push(resolve))
+  storeBusy = true
+  try {
+    return await task()
+  } finally {
+    storeBusy = false
+    const next = storeQueue.shift()
+    if (next) next()
+  }
+}
+
 async function writeStore(patch) {
-  const current = await readStore()
-  const next = { ...current, ...patch }
-  await mkdir(path.dirname(SETTINGS_PATH), { recursive: true })
-  await writeFile(SETTINGS_PATH, JSON.stringify(next, null, 2), 'utf8')
-  return next
+  return withStoreLock(async () => {
+    const current = await readStore()
+    const next = { ...current, ...patch }
+    await mkdir(path.dirname(SETTINGS_PATH), { recursive: true })
+    await writeFile(SETTINGS_PATH, JSON.stringify(next, null, 2), 'utf8')
+    return next
+  })
 }
 
 function usageKey() {
@@ -329,12 +346,17 @@ export function apply(ctx, config) {
     const mood = options.toneId || s.moodId || 'normal'
     const instructions = options.instructions ?? resolveToneInstructions(s, mood)
     const format = options.format || 'wav_24000'
-    const languageMode = s.languageMode || 'auto'
+    const languageMode = String(s.languageMode || 'auto')
+    const fixedLanguage = languageMode !== 'auto' ? languageMode : ''
     const plan = buildPlan(text, {
       emotionMode: s.emotionMode || 'fixed',
       baseInstructions: instructions,
     })
     if (!plan.segments.length) throw new Error('empty text')
+    const segments = plan.segments.map((segment) => ({
+      ...segment,
+      language_code: fixedLanguage || segment.language || String(s.languageCode || ''),
+    }))
 
     const cacheKey = createHash('sha1').update([
       voiceId,
@@ -343,9 +365,7 @@ export function apply(ctx, config) {
       instructions,
       s.modelId || '',
       format,
-      languageMode,
-      languageMode === 'auto' ? '' : String(s.languageCode || ''),
-      plan.segments.map((seg) => seg.language + '#' + seg.instructions + '#' + seg.text).join('#|#'),
+      plan.segments.map((seg) => seg.language_code + '#' + seg.instructions + '#' + seg.text).join('#|#'),
     ].join('#|#')).digest('hex').slice(0, 16)
     const cachePath = path.join(CACHE_DIR, `cache-${cacheKey}.wav`)
 
@@ -377,14 +397,13 @@ export function apply(ctx, config) {
       if (current.chars + plan.chars > Number(s.dailyChars ?? 1500)) {
         throw new Error(`daily limit reached (${current.chars}/${s.dailyChars} chars)`)
       }
-      const fixedLang = languageMode !== 'auto' ? String(s.languageCode || '') : ''
       const buffers = []
       let charged = 0
-      for (const segment of plan.segments) {
+      for (const segment of segments) {
         const body = {
           text: segment.text,
           model_id: s.modelId,
-          language_code: fixedLang || segment.language || s.languageCode,
+          language_code: segment.language_code,
         }
         if (segment.instructions) body.instructions = segment.instructions
         const audio = await callApi(`/text-to-speech/${encodeURIComponent(voiceId)}`, {

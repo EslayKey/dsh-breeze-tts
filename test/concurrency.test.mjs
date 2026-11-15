@@ -19,7 +19,7 @@ function check(name, fn) {
 }
 
 async function run() {
-  await check('never runs more than two synthesis calls at once', async () => {
+  await check('synthesis runs one call at a time', async () => {
     let active = 0
     let peak = 0
     const task = () => withSynthSlot(async () => {
@@ -30,7 +30,7 @@ async function run() {
       return true
     })
     await Promise.all(Array.from({ length: 8 }, task))
-    assert.equal(peak, 2)
+    assert.equal(peak, 1, 'quota checks and spending must be serialised')
     assert.equal(active, 0)
   })
 
