@@ -245,9 +245,10 @@ function chunkByLanguage(text, limit = 900) {
   return chunks
 }
 
-function concatWav(buffers) {
+function concatWav(buffers, gapMs = 260) {
   let fmt = null
   const frames = []
+  let gapBytes = 0
   for (const buffer of buffers) {
     if (buffer.toString('ascii', 0, 4) !== 'RIFF') throw new Error('not a wav payload')
     let pos = 12
@@ -264,7 +265,19 @@ function concatWav(buffers) {
     if (!fmt) fmt = localFmt
     else if (!fmt.equals(localFmt)) throw new Error('wav format mismatch')
   }
-  const body = Buffer.concat(frames)
+  if (fmt && fmt.length >= 16 && frames.length > 1) {
+    const channels = fmt.readUInt16LE(2)
+    const sampleRate = fmt.readUInt32LE(4)
+    const bits = fmt.readUInt16LE(14)
+    const blockAlign = Math.max(1, Math.round((channels * bits) / 8))
+    gapBytes = Math.round((sampleRate * gapMs) / 1000) * blockAlign
+  }
+  const parts = []
+  for (let index = 0; index < frames.length; index += 1) {
+    parts.push(frames[index])
+    if (index < frames.length - 1 && gapBytes > 0) parts.push(Buffer.alloc(gapBytes))
+  }
+  const body = Buffer.concat(parts)
   const header = Buffer.alloc(12)
   header.write('RIFF', 0, 'ascii')
   header.writeUInt32LE(4 + (8 + fmt.length) + (8 + body.length), 4)

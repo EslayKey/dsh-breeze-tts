@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-10-31
+
+### Fixed
+- After a client remount (or a fresh session) the "already spoken" marker could prime on an empty message list, so the previous reply was spoken again
+- Auto-speak now reads only the message's own text blocks instead of the broad fallback walk, which could pick up unrelated text
+- Added a one-line diagnostic to ~/.dsh/breeze-tts/autospeak.log recording what was spoken
+
+
+## [1.0.4] - 2026-10-31
+
+### Fixed
+- Emotion tags were mangled by the text cleaner before synthesis, so auto-speak spoke the tag fragments instead of applying them
+- A 260 ms breath is now inserted between synthesized segments, so tone changes no longer sound clipped together
+
+
+## [1.0.3] - 2026-10-31
+
+### Fixed
+- Auto-speak dropped emotion tags before synthesis, so tagged replies lost their per-segment tone; the per-message button was unaffected because it used a different text path
+- Auto-speak could fire while the reply was still being generated; it now waits until the text has been stable for a few seconds
+
+
 ## [1.0.1] - 2026-10-30
 
 ### Added

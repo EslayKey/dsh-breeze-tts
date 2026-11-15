@@ -480,9 +480,17 @@ function stripEmoji(text) {
   return out
 }
 
-function cleanForSpeech(text) {
+function cleanForSpeech(text, keepTags) {
   let value = String(text ?? '')
-  value = value.replace(/<!--[\s\S]*?-->/g, ' ')
+  const tags = []
+  if (keepTags) {
+    value = value.replace(/<!--[\s\S]*?-->/g, (match) => {
+      tags.push(match)
+      return '@@TAG' + (tags.length - 1) + '@@'
+    })
+  } else {
+    value = value.replace(/<!--[\s\S]*?-->/g, ' ')
+  }
   value = value.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
   value = value.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
   value = value.replace(/https?:\/\/[^\s)]+/g, ' ')
@@ -492,6 +500,9 @@ function cleanForSpeech(text) {
   value = value.replace(/\s+([：，。！？；、）】」》])/g, '$1')
   value = value.replace(/([（【「《])\s+/g, '$1')
   value = value.replace(/\s+/g, ' ')
+  if (keepTags && tags.length) {
+    value = value.replace(/@@TAG(\d+)@@/g, (match, index) => tags[Number(index)] || ' ')
+  }
   return value.trim()
 }
 
@@ -515,7 +526,7 @@ function cleanForSpeech(text) {
       if (!target) return ""
       const message = target.message && typeof target.message === "object" ? target.message : target
       const direct = textBlocks(message.content, [])
-      if (direct.length) return cleanForSpeech(direct.join(String.fromCharCode(10)))
+      if (direct.length) return cleanForSpeech(direct.join(String.fromCharCode(10)), true)
       const typed = collectText(message, [], 0).join(String.fromCharCode(10)).trim()
       if (typed) return typed
       return collectAnyText(message, [], 0).join(String.fromCharCode(10)).trim()
@@ -593,6 +604,7 @@ function cleanForSpeech(text) {
       }
       const primed = React.useRef(false)
       const debounce = React.useRef(null)
+      const pendingRef = React.useRef(null)
       const focused = React.useRef(true)
       const snapshot = typeof props.useChat === 'function'
         ? props.useChat((value) => (value && typeof value === 'object' ? value.legacy : undefined))
@@ -628,6 +640,7 @@ function cleanForSpeech(text) {
         if (!snapshot) return
 
         if (!primed.current) {
+          if (!nodes.length) return
           primed.current = true
           for (const node of nodes) {
             const id = node && (node.id || node.messageId || (node.message && node.message.id))
@@ -637,11 +650,12 @@ function cleanForSpeech(text) {
         }
 
         if (debounce.current) window.clearTimeout(debounce.current)
-        debounce.current = window.setTimeout(evaluate, 600)
+        debounce.current = window.setTimeout(evaluate, 1000)
         return
 
         function evaluate() {
         let text = ''
+        let measure = ''
         let id = ''
         for (let index = nodes.length - 1; index >= 0; index -= 1) {
           const node = nodes[index]
@@ -650,21 +664,53 @@ function cleanForSpeech(text) {
           const candidateId = node.id || node.messageId || (node.message && node.message.id) || ''
           if (!candidateId || played.current.ids.has(candidateId)) continue
           let raw = ''
+          let source = 'content'
           try {
-            raw = collectText(node, [], 0).join(' ')
-            if (!raw) raw = collectAnyText(node, [], 0).join(' ')
+            const message = node.message && typeof node.message === 'object' ? node.message : node
+            raw = textBlocks(message.content, []).join(' ')
+            if (!raw) {
+              raw = collectText(node, [], 0).join(' ')
+              source = 'collect'
+            }
           } catch {
             raw = ''
           }
-          const cleaned = cleanForSpeech(raw)
-          if (!cleaned) continue
-          const recent = played.current.texts.get(cleaned.slice(0, 80))
+          const spokenText = cleanForSpeech(raw, true)
+          const plain = cleanForSpeech(raw)
+          if (!plain) continue
+          const recent = played.current.texts.get(plain.slice(0, 80))
           if (recent && Date.now() - recent < 60000) {
             markSpoken(candidateId, '')
             continue
           }
-          text = cleaned
+          const pending = pendingRef.current
+          if (!pending || pending.id !== candidateId || pending.text !== spokenText) {
+            pendingRef.current = { id: candidateId, text: spokenText, at: Date.now() }
+            if (debounce.current) window.clearTimeout(debounce.current)
+            debounce.current = window.setTimeout(evaluate, 1200)
+            return
+          }
+          if (Date.now() - pending.at < 2500) {
+            if (debounce.current) window.clearTimeout(debounce.current)
+            debounce.current = window.setTimeout(evaluate, 1200)
+            return
+          }
+          pendingRef.current = null
+          text = spokenText
+          measure = plain
           id = candidateId
+          try {
+            const node2 = node
+            const blocks = node2 && node2.message && Array.isArray(node2.message.content) ? node2.message.content : (Array.isArray(node2.blocks) ? node2.blocks : [])
+            const kinds = blocks.slice(0, 6).map((b) => String((b && (b.type || b.kind)) || '?')).join(',')
+            fetch('/breeze-tts/log', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ msg: 'speak src=' + source + ' id=' + candidateId.slice(0, 18) + ' len=' + plain.length + ' kinds=' + kinds }),
+            }).catch(() => {})
+          } catch {
+            /* logging must never break playback */
+          }
           break
         }
         if (!id) {
@@ -684,7 +730,7 @@ function cleanForSpeech(text) {
             const limit = Number((data && data.autoSpeakMaxChars) || 0)
             if (!data || !data.autoSpeak) return null
             if (limit <= 0) return null
-            if (text.length > limit) return null
+            if (measure.length > limit) return null
             if (!data.backgroundPlay && !focused.current) return null
             return speakRemotely({ text }, { host: true })
           })
