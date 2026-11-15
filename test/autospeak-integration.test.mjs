@@ -119,6 +119,7 @@ assert.equal(typeof AutoSpeakChip, 'function')
 // --- scripted fetch -------------------------------------------------------
 const calls = []
 let statusGate = null
+let playGate = null
 let synthFails = false
 globalThis.fetch = async (url, init = {}) => {
   const target = String(url)
@@ -145,6 +146,12 @@ globalThis.fetch = async (url, init = {}) => {
   }
   if (target.endsWith('/play-file')) {
     if (synthFails) throw new Error('play failed')
+    if (playGate) {
+      return new Promise((resolve, reject) => {
+        playGate.resolve = () => resolve(json({ ok: true }))
+        playGate.reject = () => reject(new Error('play failed'))
+      })
+    }
     return json({ ok: true })
   }
   if (target.endsWith('/log')) return json({ ok: true })
@@ -293,6 +300,34 @@ await check('a failed play is not recorded as played', async () => {
   const ids = stored.ids || []
   assert.equal(ids.includes('m10'), false, 'a failure must not be marked as played')
   synthFails = false
+})
+
+await check('a session switch during /play writes nothing into the new session', async () => {
+  calls.length = 0
+  current = null
+  window.localStorage.store.clear()
+  store.sessionId = 's1'
+  store.view = makeView({ partial: null, turnEnded: true, id: 'm11' })
+  draw()
+  await flush(0)
+  store.view = makeView({ partial: null, turnEnded: true, id: 'm12' })
+  draw()
+  playGate = {}
+  await flush(400)
+  await flush(20)
+  await flush(0)
+  assert.ok(playGate.resolve, 'the /play call should be in flight')
+  store.sessionId = 's2'
+  draw()
+  await flush(0)
+  playGate.resolve()
+  await flush(20)
+  const s2 = JSON.parse(window.localStorage.store.get('breeze-tts:spoken:s2') || '{}')
+  const s1 = JSON.parse(window.localStorage.store.get('breeze-tts:spoken:s1') || '{}')
+  assert.equal((s2.ids || []).includes('m12'), false, 'must not record into the new session')
+  assert.equal((s1.ids || []).includes('m12'), false, 'the switch made the result stale')
+  assert.equal(calls.filter((c) => c.url.endsWith('/synth')).length, 1, 'no replay after the switch')
+  playGate = null
 })
 
 console.log('\n' + passed + ' checks passed')

@@ -23,6 +23,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 - `languageMode: 'en'|'zh'` works again (a non-auto mode is the language itself); the language actually sent is what the cache key and the budget use
 
 ### Fixed (auto-speak lifecycle)
+- The play call is checked against its generation and pending instance after it resolves, so a session switch can no longer write the old reply into the new session's state
+- The synthesis/play request is never replayed after it was sent (a retry could charge and speak twice); such a failure is recorded as skipped and left to the manual button, while the read-only `/status` keeps a bounded retry
 - A `/status` already in flight is abandoned when the same session starts a new stream, the signal disappears or the candidate is replaced; only identical re-renders keep waiting
 - A message is marked spoken only after playback succeeds, so a failed `/status` or play is retried with backoff (three attempts) instead of being recorded
 - Replies skipped by settings (auto-speak off, over the limit, background) are recorded as skipped and never replayed later
@@ -37,7 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 - `play:true` with a `.mp3` save path synthesised WAV and handed it to the player; it is now refused before any request
 
 ### Added
-- `plan.js` with offline tests: `plan`, `concurrency`, `tool`, `autospeak`, `autospeak-timer`, `autospeak-integration`, `tts_speak` (49 checks)
+- `plan.js` with offline tests: `plan`, `concurrency`, `tool`, `autospeak`, `autospeak-timer`, `autospeak-integration`, `tts_speak` (50 checks)
 
 
 ## [1.0.5] - 2026-10-31

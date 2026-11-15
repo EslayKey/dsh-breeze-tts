@@ -719,7 +719,7 @@ function cleanForSpeech(text, keepTags) {
       }, [])
 
       const gate = React.useRef(null)
-      const pendingId = React.useRef("")
+      const pending = React.useRef({ id: "", token: -1 })
       const retryAt = React.useRef(new Map())
       const retryCounts = React.useRef(new Map())
       const [tick, setTick] = React.useState(0)
@@ -735,13 +735,21 @@ function cleanForSpeech(text, keepTags) {
         }
         return () => {
           gate.current.invalidate()
-          pendingId.current = ""
+          pending.current = { id: "", token: -1 }
         }
       }, [props.sessionId])
 
+      const stillMine = (id, token) => gate.current.generation() === token
+        && pending.current.id === id
+        && pending.current.token === token
+
+      const release = (id, token) => {
+        if (stillMine(id, token)) pending.current = { id: "", token: -1 }
+      }
+
       const attempt = async (id, spokenText, plain, token) => {
-        if (gate.current.generation() !== token) {
-          if (pendingId.current === id) pendingId.current = ""
+        if (!stillMine(id, token)) {
+          release(id, token)
           return
         }
         let data = null
@@ -750,13 +758,14 @@ function cleanForSpeech(text, keepTags) {
         } catch (error) {
           data = null
         }
-        if (gate.current.generation() !== token) {
-          if (pendingId.current === id) pendingId.current = ""
+        if (!stillMine(id, token)) {
+          release(id, token)
           return
         }
         if (!data) {
-          retryLater(id)
-          if (pendingId.current === id) pendingId.current = ""
+          // /status is read-only, so a bounded retry cannot cost anything.
+          retryLater(id, token)
+          release(id, token)
           return
         }
         const limit = Number(data.autoSpeakMaxChars || 0)
@@ -766,19 +775,27 @@ function cleanForSpeech(text, keepTags) {
           || (!data.backgroundPlay && !focused.current)
         if (refused) {
           markSkipped(id)
-          if (pendingId.current === id) pendingId.current = ""
+          release(id, token)
           return
         }
         try {
           await speakRemotely({ text: spokenText }, { host: true })
-          markSpoken(id, spokenText)
         } catch (error) {
-          retryLater(id)
+          // The synthesis (and possibly playback) request was already sent:
+          // replaying it could charge and speak twice, so it is recorded as
+          // skipped and left to the manual button.
+          if (stillMine(id, token)) markSkipped(id)
+          release(id, token)
+          return
         }
-        if (pendingId.current === id) pendingId.current = ""
+        if (stillMine(id, token)) {
+          markSpoken(id, spokenText)
+        }
+        release(id, token)
       }
 
-      const retryLater = (id) => {
+      const retryLater = (id, token) => {
+        if (!stillMine(id, token)) return
         const attempts = (retryCounts.current.get(id) || 0) + 1
         retryCounts.current.set(id, attempts)
         if (attempts >= 3) {
@@ -792,7 +809,7 @@ function cleanForSpeech(text, keepTags) {
       React.useEffect(() => {
         if (!snapshot) {
           gate.current.invalidate()
-          pendingId.current = ""
+          pending.current = { id: "", token: -1 }
           return undefined
         }
         const view = snapshot
@@ -812,7 +829,7 @@ function cleanForSpeech(text, keepTags) {
         const decision = decideAutoSpeak(view)
         if (decision.action === "skip" && decision.reason === "no-turn-signal") {
           gate.current.invalidate()
-          pendingId.current = ""
+          pending.current = { id: "", token: -1 }
           if (!warned.current) {
             warned.current = true
             try {
@@ -829,14 +846,16 @@ function cleanForSpeech(text, keepTags) {
         }
         if (decision.action !== "candidate") {
           gate.current.invalidate()
-          pendingId.current = ""
+          pending.current = { id: "", token: -1 }
           return undefined
         }
         if (played.current.ids.has(decision.id) || played.current.skipped.has(decision.id)) {
-          if (pendingId.current === decision.id) pendingId.current = ""
+          release(decision.id, pending.current.token)
           return undefined
         }
-        if (pendingId.current === decision.id) return undefined
+        if (pending.current.id === decision.id && pending.current.token === gate.current.generation()) {
+          return undefined
+        }
         if ((retryAt.current.get(decision.id) || 0) > Date.now()) return undefined
 
         const spokenText = cleanForSpeech(decision.text, true)
@@ -850,7 +869,7 @@ function cleanForSpeech(text, keepTags) {
 
         gate.current.invalidate()
         const token = gate.current.generation()
-        pendingId.current = decision.id
+        pending.current = { id: decision.id, token }
         gate.current.schedule(token, 400, () => {
           void attempt(decision.id, spokenText, plain, token)
         })
