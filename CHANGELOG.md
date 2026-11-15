@@ -18,8 +18,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 - Partial failures left already-synthesised segments unaccounted
 - Concurrent requests for the same text called the API twice; synthesis now runs at most two calls in parallel
 
+### Fixed (tool surface)
+- `tts_speak` ignored its public `mood` argument; it now maps to the matching tone and its instructions
+- `play:true` with a `.mp3` save path synthesised WAV and handed it to the player; it is now refused before any request
+
 ### Added
-- `plan.js` with offline tests (`node test/plan.test.mjs`, `node test/concurrency.test.mjs`)
+- `plan.js` with offline tests (`node test/plan.test.mjs`, `node test/concurrency.test.mjs`, `node test/tool.test.mjs`)
 
 
 ## [1.0.5] - 2026-10-31

@@ -48,6 +48,32 @@ const synthQueue = []
 let activeSynthCalls = 0
 const MAX_CONCURRENT_SYNTH = 2
 
+function resolveToneInstructions(settings, toneId) {
+  const custom = String((settings && settings.customMood) || '').trim()
+  const tone = ((settings && settings.tones) || []).find((item) => item.id === toneId)
+  return custom || (tone ? tone.instructions : '')
+}
+
+function resolveSpeakOptions(input) {
+  const source = input && typeof input === 'object' ? input : {}
+  const savePath = typeof source.save_path === 'string' ? source.save_path : ''
+  const plays = source.play !== false
+  const wantsFile = savePath !== ''
+  const wantsMp3 = wantsFile && /\.mp3$/i.test(savePath)
+  if (plays && wantsMp3) {
+    return {
+      error: 'mp3 files cannot be played back; use a save_path ending in .wav, or set play:false to only write the file',
+    }
+  }
+  return {
+    savePath,
+    plays,
+    wantsFile,
+    format: !plays && wantsMp3 ? 'mp3_24000_96' : 'wav_24000',
+    toneId: typeof source.mood === 'string' ? source.mood : '',
+  }
+}
+
 async function withSynthSlot(task) {
   if (activeSynthCalls >= MAX_CONCURRENT_SYNTH) {
     await new Promise((resolve) => synthQueue.push(resolve))
@@ -301,9 +327,7 @@ export function apply(ctx, config) {
     const voiceId = options.voiceId || s.voiceId
     if (!voiceId) throw new Error('missing voice id')
     const mood = options.toneId || s.moodId || 'normal'
-    const tone = (s.tones ?? []).find((item) => item.id === mood)
-    const customTone = String(s.customMood || '').trim()
-    const instructions = options.instructions ?? (customTone || (tone ? tone.instructions : ''))
+    const instructions = options.instructions ?? resolveToneInstructions(s, mood)
     const format = options.format || 'wav_24000'
     const languageMode = s.languageMode || 'auto'
     const plan = buildPlan(text, {
@@ -435,7 +459,7 @@ export function apply(ctx, config) {
         type: 'object',
         properties: {
           text: { type: 'string', description: 'Text to synthesize. Long text is split on sentence marks.' },
-          mood: { type: 'string', description: 'Delivery preset: normal, lazy, silly or eager. Defaults to the configured mood.' },
+          mood: { type: 'string', description: 'Tone id from the configured tones (normal, warm, formal, lively, or a custom id). Defaults to the configured tone.' },
           voice_id: { type: 'string', description: 'Voice id override. Defaults to the configured voice.' },
           play: { type: 'boolean', description: 'Play through the speakers. Set false to only produce the file.' },
           save_path: { type: 'string', description: 'Absolute path to also write the audio to.' },
@@ -458,11 +482,14 @@ export function apply(ctx, config) {
       },
       async execute(args) {
         const input = args ?? {}
-        const savePath = typeof input.save_path === 'string' ? input.save_path : ''
-        const wantsFile = savePath !== ''
-        const plays = input.play !== false
-        const format = !plays && wantsFile && /\.mp3$/i.test(savePath) ? 'mp3_24000_96' : 'wav_24000'
-        const result = await synth(input.text, { mood: input.mood, voiceId: input.voice_id, format })
+        const options = resolveSpeakOptions(input)
+        if (options.error) throw new Error(options.error)
+        const { plays, format, savePath } = options
+        const result = await synth(input.text, {
+          toneId: options.toneId || undefined,
+          voiceId: input.voice_id,
+          format,
+        })
         await mkdir(CACHE_DIR, { recursive: true })
         const file = path.join(CACHE_DIR, `${Date.now()}-${randomUUID().slice(0, 8)}.${format.startsWith('wav') ? 'wav' : 'mp3'}`)
         await saveAudio(result, file)
@@ -912,4 +939,7 @@ export const __test = {
   withSynthSlot,
   inflight,
   buildPlan,
+  resolveSpeakOptions,
+  resolveToneInstructions,
+  DEFAULT_TONES,
 }
