@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-11-15
+
+### Changed
+- One normalised segment plan now drives requests, daily budget and the cache key, so all three can no longer disagree
+- Auto-speak waits for the harness turn-end signal (`legacy.turnEnds`); when that signal is missing it stays silent and leaves reading to the manual button
+
+### Fixed
+- A single leading emotion marker stayed in the spoken text
+- Sentences longer than the API limit were sent whole; they are now split without breaking Unicode
+- Mixed Chinese/English text was synthesised as one request with one language
+- Partial failures left already-synthesised segments unaccounted
+- Concurrent requests for the same text called the API twice; synthesis now runs at most two calls in parallel
+
+### Added
+- `plan.js` with offline tests (`node test/plan.test.mjs`, `node test/concurrency.test.mjs`)
+
+
 ## [1.0.5] - 2026-10-31
 
 ### Fixed

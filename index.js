@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
+import { buildPlan } from './plan.js'
 
 const API_BASE = 'https://api.breeze.blue/v1'
 const ROUTE_PREFIX = '/breeze-tts'
@@ -42,6 +43,25 @@ const DEFAULTS = {
 
 export const inject = ['tools', 'webServer']
 
+const inflight = new Map()
+const synthQueue = []
+let activeSynthCalls = 0
+const MAX_CONCURRENT_SYNTH = 2
+
+async function withSynthSlot(task) {
+  if (activeSynthCalls >= MAX_CONCURRENT_SYNTH) {
+    await new Promise((resolve) => synthQueue.push(resolve))
+  }
+  activeSynthCalls += 1
+  try {
+    return await task()
+  } finally {
+    activeSynthCalls -= 1
+    const next = synthQueue.shift()
+    if (next) next()
+  }
+}
+
 function parseJson(text) {
   try {
     return JSON.parse(text)
@@ -77,172 +97,6 @@ function usageKey() {
 
 function creditsOf(chars) {
   return Math.round(chars * 0.19 * 10) / 10
-}
-
-const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/g
-const LATIN = /[A-Za-z]/g
-
-const SENTENCE_MARKS = [0x3002, 0xFF01, 0xFF1F, 0x2026, 0xFF1B, 0x21, 0x3F, 0x3B, 0x0A].map((code) => String.fromCharCode(code)).join('')
-
-function countMatches(text, pattern) {
-  const found = String(text).match(pattern)
-  return found ? found.length : 0
-}
-
-function stripEmoji(text) {
-  let out = ''
-  for (const ch of String(text ?? '')) {
-    const cp = ch.codePointAt(0)
-    if (cp >= 0x1f000 && cp <= 0x1faff) continue
-    if (cp >= 0x2600 && cp <= 0x27bf) continue
-    if (cp === 0xfe0f || cp === 0x200d || cp === 0x2b50) continue
-    out += ch
-  }
-  return out
-}
-
-function cleanSpeech(text, keepTags) {
-  let value = String(text ?? '')
-  if (!keepTags) value = value.replace(/<!--[\s\S]*?-->/g, ' ')
-  value = value.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-  value = value.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-  value = value.replace(/https?:\/\/[^\s)]+/g, ' ')
-  value = value.replace(/`{1,3}[^`]*`{1,3}/g, ' ')
-  value = value.replace(/[*_~#>|]+/g, ' ')
-  value = stripEmoji(value)
-  value = value.replace(/\s+([：，。！？；、）】」》])/g, '$1')
-  value = value.replace(/([（【「《])\s+/g, '$1')
-  value = value.replace(/\s+/g, ' ')
-  return value.trim()
-}
-
-function detectLanguage(text) {
-  const cjk = countMatches(text, CJK)
-  const latin = countMatches(text, LATIN)
-  if (cjk === 0) return latin > 0 ? "en" : ""
-  return cjk * 2 >= latin ? "zh" : "en"
-}
-
-function splitSentences(text) {
-  const value = String(text ?? '').trim()
-  if (!value) return []
-  const parts = []
-  let buffer = ''
-  for (let index = 0; index < value.length; index += 1) {
-    const ch = value[index]
-    buffer += ch
-    const next = value[index + 1]
-    const asciiStop = ch === '.' && (next === undefined || next === ' ' || next === String.fromCharCode(10) || next === String.fromCharCode(9) || next === '"' || next === "'" || next === ')' || next === ']')
-    if (SENTENCE_MARKS.includes(ch) || asciiStop) {
-      parts.push(buffer)
-      buffer = ''
-    }
-  }
-  if (buffer.trim()) parts.push(buffer)
-  return parts.map((part) => part.trim()).filter(Boolean)
-}
-
-const EMOTIONS = {
-  curious: 'TONE_CURIOUS',
-  excited: 'TONE_EXCITED',
-  sad: 'TONE_SAD',
-  gentle: 'TONE_GENTLE',
-}
-
-function emotionInstruction(emotion) {
-  if (emotion === 'curious') return '语气带着好奇和疑问，句尾略微上扬。'
-  if (emotion === 'excited') return '语气兴奋，语速稍快，音调偏高。'
-  if (emotion === 'happy') return '语气愉快，带着笑意，句尾轻轻上扬。'
-  if (emotion === 'angry') return '语气生气，音量略高，语速偏快，带着一点压迫感。'
-  if (emotion === 'down') return '语气沮丧，声音发闷，语速放慢。'
-  if (emotion === 'sad') return '语气低落，语速放慢，尾音下沉。'
-  if (emotion === 'whisper') return '压低声音像耳语，气息多，音量小。'
-  if (emotion === 'surprised') return '语气惊讶，语调突然抬高，语速略快。'
-  if (emotion === 'afraid') return '语气带着紧张和不安，声音发抖，语速不稳。'
-  if (emotion === 'serious') return '语气严肃克制，吐字清楚，节奏稳定。'
-  if (emotion === 'tired') return '语气疲惫，声音有气无力，语速偏慢。'
-  if (emotion === 'gentle') return '语气轻柔，像在轻声安慰对方。'
-  return ''
-}
-
-function guessEmotion(sentence) {
-  const value = String(sentence).trim()
-  if (!value) return ''
-  if (/[?？]\s*$/.test(value)) return 'curious'
-  if (/[!！]\s*$/.test(value)) return 'excited'
-  if (/(…|\.\.\.)\s*$/.test(value)) return 'sad'
-  return ''
-}
-
-function splitByMarker(text) {
-  const parts = []
-  const pattern = /<!--\s*mood:\s*([a-z-]+)\s*-->/gi
-  let lastIndex = 0
-  let current = ''
-  let match = pattern.exec(text)
-  while (match) {
-    const before = text.slice(lastIndex, match.index)
-    if (before.trim()) parts.push({ text: before, emotion: current })
-    current = String(match[1] || '').toLowerCase()
-    lastIndex = match.index + match[0].length
-    match = pattern.exec(text)
-  }
-  const tail = text.slice(lastIndex)
-  if (tail.trim()) parts.push({ text: tail, emotion: current })
-  return parts
-}
-
-function planSegments(text, mode, baseInstructions) {
-  const sentences = splitSentences(text)
-  const segments = []
-  let pendingEmotion = ''
-
-  let carry = ''
-  for (const sentence of sentences) {
-    let emotion = mode === 'infer' ? guessEmotion(sentence) : ''
-    if (!emotion && carry && sentence.length <= 40) emotion = carry
-    if (emotion) carry = emotion
-    const instructions = emotion ? emotionInstruction(emotion) : baseInstructions
-    const last = segments[segments.length - 1]
-    if (last && last.instructions === instructions && last.text.length + sentence.length <= 900) {
-      last.text += sentence
-      continue
-    }
-    segments.push({ text: sentence, instructions, emotion: emotion || pendingEmotion })
-  }
-  if (mode === 'marker') {
-    const parts = splitByMarker(text)
-    if (parts.length > 1) {
-      const merged = []
-      for (const part of parts) {
-        const piece = cleanSpeech(part.text)
-        if (!piece) continue
-        const instructions = part.emotion ? (emotionInstruction(part.emotion) || baseInstructions) : baseInstructions
-        const last = merged[merged.length - 1]
-        if (last && last.instructions === instructions && last.text.length + piece.length <= 900) {
-          last.text += piece
-          continue
-        }
-        merged.push({ text: piece, instructions, emotion: part.emotion })
-      }
-      return merged
-    }
-  }
-  return segments
-}
-
-function chunkByLanguage(text, limit = 900) {
-  const chunks = []
-  for (const part of splitSentences(text)) {
-    const lang = detectLanguage(part)
-    const last = chunks[chunks.length - 1]
-    if (last && last.lang === lang && last.text.length + part.length <= limit) {
-      last.text += part
-      continue
-    }
-    chunks.push({ text: part, lang })
-  }
-  return chunks
 }
 
 function concatWav(buffers, gapMs = 260) {
@@ -446,24 +300,38 @@ export function apply(ctx, config) {
     if (!s.apiKey) throw new Error('missing Breeze API key: write it into ~/.dsh/breeze.json')
     const voiceId = options.voiceId || s.voiceId
     if (!voiceId) throw new Error('missing voice id')
-    const moodId = options.toneId || s.moodId || 'normal'
-    const tone = (s.tones ?? []).find((item) => item.id === moodId)
-    const mood = moodId
+    const mood = options.toneId || s.moodId || 'normal'
+    const tone = (s.tones ?? []).find((item) => item.id === mood)
     const customTone = String(s.customMood || '').trim()
     const instructions = options.instructions ?? (customTone || (tone ? tone.instructions : ''))
     const format = options.format || 'wav_24000'
-    const planSource = (s.emotionMode === 'marker') ? String(text ?? '') : cleanSpeech(text)
-    const chunks = chunkByLanguage(cleanSpeech(text))
-    if (chunks.length === 0) throw new Error('empty text')
-    const cacheKey = createHash('sha1').update([voiceId, mood, s.emotionMode || 'fixed', instructions, planSource].join('|')).digest('hex').slice(0, 16)
+    const languageMode = s.languageMode || 'auto'
+    const plan = buildPlan(text, {
+      emotionMode: s.emotionMode || 'fixed',
+      baseInstructions: instructions,
+    })
+    if (!plan.segments.length) throw new Error('empty text')
+
+    const cacheKey = createHash('sha1').update([
+      voiceId,
+      mood,
+      s.emotionMode || 'fixed',
+      instructions,
+      s.modelId || '',
+      format,
+      languageMode,
+      languageMode === 'auto' ? '' : String(s.languageCode || ''),
+      plan.segments.map((seg) => seg.language + '#' + seg.instructions + '#' + seg.text).join('#|#'),
+    ].join('#|#')).digest('hex').slice(0, 16)
     const cachePath = path.join(CACHE_DIR, `cache-${cacheKey}.wav`)
+
     if (format.startsWith('wav')) {
       try {
         const hit = await readFile(cachePath)
         if (hit.length > 44) {
           return {
             audio: hit,
-            langs: ['cache'],
+            langs: plan.segments.map((seg) => seg.emotion || seg.language || ''),
             chars: 0,
             credits: 0,
             mood,
@@ -476,47 +344,58 @@ export function apply(ctx, config) {
         /* cache miss */
       }
     }
-    const current = await usage()
-    if (current.chars + chunks.map((piece) => piece.text).join('').length > Number(s.dailyChars ?? 1500)) {
-      throw new Error(`daily limit reached (${current.chars}/${s.dailyChars} chars)`)
-    }
-    const buffers = []
-    const fixed = s.languageMode && s.languageMode !== 'auto' ? String(s.languageMode) : ''
-    const segments = planSegments(planSource, s.emotionMode || 'fixed', instructions)
-    for (const piece of segments) {
-      const chunk = piece.text
-      const segInstructions = piece.instructions || instructions
-      const segLang = detectLanguage(chunk) || s.languageCode
-      const body = {
-        text: chunk,
-        model_id: s.modelId,
-        language_code: fixed || segLang,
+
+    const pending = inflight.get(cacheKey)
+    if (pending) return pending
+
+    const job = withSynthSlot(async () => {
+      const current = await usage()
+      if (current.chars + plan.chars > Number(s.dailyChars ?? 1500)) {
+        throw new Error(`daily limit reached (${current.chars}/${s.dailyChars} chars)`)
       }
-      if (segInstructions) body.instructions = segInstructions
-      const audio = await callApi(`/text-to-speech/${encodeURIComponent(voiceId)}`, {
-        method: 'POST',
-        body,
-        query: { output_format: format, delivery: 'sync' },
-        apiKey: s.apiKey,
-        binary: true,
-      })
-      buffers.push(audio)
-    }
-    const chars = segments.map((piece) => piece.text).join('').length
-    const merged = format.startsWith('wav') && buffers.length > 1 ? concatWav(buffers) : Buffer.concat(buffers)
-    await accountUsage(chars)
-    if (format.startsWith('wav')) {
-      await mkdir(CACHE_DIR, { recursive: true }).catch(() => {})
-      await writeFile(cachePath, merged).catch(() => {})
-    }
-    return {
-      audio: merged,
-      langs: segments.map((piece) => piece.emotion || detectLanguage(piece.text) || ''),
-      chars,
-      credits: creditsOf(chars),
-      mood,
-      voiceId,
-      format: format.startsWith('wav') ? 'wav' : 'mp3',
+      const fixedLang = languageMode !== 'auto' ? String(s.languageCode || '') : ''
+      const buffers = []
+      let charged = 0
+      for (const segment of plan.segments) {
+        const body = {
+          text: segment.text,
+          model_id: s.modelId,
+          language_code: fixedLang || segment.language || s.languageCode,
+        }
+        if (segment.instructions) body.instructions = segment.instructions
+        const audio = await callApi(`/text-to-speech/${encodeURIComponent(voiceId)}`, {
+          method: 'POST',
+          body,
+          query: { output_format: format, delivery: 'sync' },
+          apiKey: s.apiKey,
+          binary: true,
+        })
+        buffers.push(audio)
+        const size = Array.from(segment.text).length
+        charged += size
+        await accountUsage(size)
+      }
+      const merged = format.startsWith('wav') && buffers.length > 1 ? concatWav(buffers) : Buffer.concat(buffers)
+      if (format.startsWith('wav')) {
+        await mkdir(CACHE_DIR, { recursive: true }).catch(() => {})
+        await writeFile(cachePath, merged).catch(() => {})
+      }
+      return {
+        audio: merged,
+        langs: plan.segments.map((seg) => seg.emotion || seg.language || ''),
+        chars: charged,
+        credits: creditsOf(charged),
+        mood,
+        voiceId,
+        format: format.startsWith('wav') ? 'wav' : 'mp3',
+      }
+    })
+
+    inflight.set(cacheKey, job)
+    try {
+      return await job
+    } finally {
+      inflight.delete(cacheKey)
     }
   }
 
@@ -1026,4 +905,11 @@ export function apply(ctx, config) {
   }, 'dsh-breeze-tts: tools and routes')
 
   ctx.logger?.info?.(`breeze-tts ready (voice ${cfg.voiceId}, ${clip(cfg.modelId)})`)
+}
+
+/** Exposed for offline tests only; the harness ignores extra exports. */
+export const __test = {
+  withSynthSlot,
+  inflight,
+  buildPlan,
 }

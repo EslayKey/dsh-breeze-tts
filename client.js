@@ -604,7 +604,13 @@ function cleanForSpeech(text, keepTags) {
       }
       const primed = React.useRef(false)
       const debounce = React.useRef(null)
-      const pendingRef = React.useRef(null)
+      const warned = React.useRef(false)
+      const turnSignal = (value) => Boolean(value && value.turnEnds && typeof value.turnEnds.has === 'function')
+      const turnFinished = (value, node) => {
+        if (!turnSignal(value)) return false
+        if (node.turn === undefined || node.turn === null) return false
+        return value.turnEnds.has(node.turn)
+      }
       const focused = React.useRef(true)
       const snapshot = typeof props.useChat === 'function'
         ? props.useChat((value) => (value && typeof value === 'object' ? value.legacy : undefined))
@@ -649,8 +655,22 @@ function cleanForSpeech(text, keepTags) {
           return
         }
 
+        if (!turnSignal(snapshot)) {
+          if (!warned.current) {
+            warned.current = true
+            fetch('/breeze-tts/log', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ msg: 'auto-speak disabled: no turnEnds signal in this build' }),
+            }).catch(() => {})
+          }
+          return
+        }
+        if (snapshot.partial) return
+        if (Array.isArray(snapshot.runningCalls) && snapshot.runningCalls.length > 0) return
+
         if (debounce.current) window.clearTimeout(debounce.current)
-        debounce.current = window.setTimeout(evaluate, 1000)
+        debounce.current = window.setTimeout(evaluate, 400)
         return
 
         function evaluate() {
@@ -661,6 +681,8 @@ function cleanForSpeech(text, keepTags) {
           const node = nodes[index]
           if (!node || typeof node !== 'object') continue
           if (String(node.kind || '') !== 'assistant') continue
+          if (node.interrupted === true) continue
+          if (!turnFinished(snapshot, node)) continue
           const candidateId = node.id || node.messageId || (node.message && node.message.id) || ''
           if (!candidateId || played.current.ids.has(candidateId)) continue
           let raw = ''
@@ -683,19 +705,6 @@ function cleanForSpeech(text, keepTags) {
             markSpoken(candidateId, '')
             continue
           }
-          const pending = pendingRef.current
-          if (!pending || pending.id !== candidateId || pending.text !== spokenText) {
-            pendingRef.current = { id: candidateId, text: spokenText, at: Date.now() }
-            if (debounce.current) window.clearTimeout(debounce.current)
-            debounce.current = window.setTimeout(evaluate, 1200)
-            return
-          }
-          if (Date.now() - pending.at < 2500) {
-            if (debounce.current) window.clearTimeout(debounce.current)
-            debounce.current = window.setTimeout(evaluate, 1200)
-            return
-          }
-          pendingRef.current = null
           text = spokenText
           measure = plain
           id = candidateId
