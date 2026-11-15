@@ -18,12 +18,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 - Partial failures left already-synthesised segments unaccounted
 - Concurrent requests for the same text called the API twice; synthesis now runs at most two calls in parallel
 
+### Fixed (auto-speak completion)
+- Speech now requires the recorded turn end reason to be `completed`; error, aborted, interrupted and unknown endings never speak
+- A pending 400 ms timer is cancelled on every render and on session switch, and a late `/status` reply is discarded, so the previous session can no longer be spoken
+- The played-message table follows the active session
+
 ### Fixed (tool surface)
 - `tts_speak` ignored its public `mood` argument; it now maps to the matching tone and its instructions
 - `play:true` with a `.mp3` save path synthesised WAV and handed it to the player; it is now refused before any request
 
 ### Added
-- `plan.js` with offline tests (`node test/plan.test.mjs`, `node test/concurrency.test.mjs`, `node test/tool.test.mjs`)
+- `plan.js` with offline tests: `plan`, `concurrency`, `tool`, `autospeak`, `autospeak-timer` (38 checks)
 
 
 ## [1.0.5] - 2026-10-31

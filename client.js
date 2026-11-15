@@ -532,6 +532,81 @@ function cleanForSpeech(text, keepTags) {
       return collectAnyText(message, [], 0).join(String.fromCharCode(10)).trim()
     }
 
+    /**
+     * One pending auto-speak timer bound to a generation token.
+     * A session switch invalidates the token, so a stale timer or a late
+     * /status response from the previous session can never speak.
+     */
+    function createTurnTimer() {
+      let generation = 0
+      let handle = null
+      const clear = () => {
+        if (handle !== null) {
+          window.clearTimeout(handle)
+          handle = null
+        }
+      }
+      return {
+        generation: () => generation,
+        invalidate() {
+          generation += 1
+          clear()
+        },
+        clear,
+        schedule(token, delay, run) {
+          clear()
+          handle = window.setTimeout(() => {
+            handle = null
+            if (generation === token) run()
+          }, delay)
+        },
+      }
+    }
+
+    /**
+     * Decide what the auto-speaker may do with one chat view state.
+     * Pure: no timers, no requests, so it can be tested offline.
+     */
+    function decideAutoSpeak(view) {
+      const legacy = view && view.legacy
+      if (!legacy || !legacy.turnEnds || typeof legacy.turnEnds.has !== "function") {
+        return { action: "skip", reason: "no-turn-signal" }
+      }
+      if (legacy.partial) return { action: "wait", reason: "streaming" }
+      if (Array.isArray(legacy.runningCalls) && legacy.runningCalls.length > 0) {
+        return { action: "wait", reason: "tool-running" }
+      }
+      const turns = view.timeline && view.timeline.turns
+      const nodes = Array.isArray(legacy.nodes) ? legacy.nodes : []
+      for (let index = nodes.length - 1; index >= 0; index -= 1) {
+        const node = nodes[index]
+        if (!node || typeof node !== "object") continue
+        if (String(node.kind || "") !== "assistant") continue
+        if (node.interrupted === true) continue
+        if (node.turn === undefined || node.turn === null) continue
+        if (!legacy.turnEnds.has(node.turn)) continue
+        const turn = turns && typeof turns.get === "function" ? turns.get(node.turn) : undefined
+        const reason = turn && turn.end && turn.end.data ? turn.end.data.reason : undefined
+        const kind = reason && typeof reason.kind === "string" ? reason.kind : ""
+        if (kind !== "completed") {
+          return { action: "skip", reason: "turn-" + (kind || "unknown"), turn: node.turn }
+        }
+        const id = node.id || node.messageId || (node.message && node.message.id) || ""
+        if (!id) continue
+        let text = ""
+        try {
+          const message = node.message && typeof node.message === "object" ? node.message : node
+          text = textBlocks(message.content, []).join(" ")
+          if (!text) text = collectText(node, [], 0).join(" ")
+        } catch (error) {
+          text = ""
+        }
+        if (!text) continue
+        return { action: "candidate", id, turn: node.turn, kind, text }
+      }
+      return { action: "none", reason: "no-candidate" }
+    }
+
     function SpeakButton(props) {
       const [phase, setPhase] = React.useState('idle')
       const [fail, setFail] = React.useState('')
@@ -577,21 +652,19 @@ function cleanForSpeech(text, keepTags) {
     function AutoSpeakChip(props) {
       const t = props.t
       const [state] = useStatus()
-      const played = React.useRef(null)
-      if (!played.current) {
-        const key = 'breeze-tts:spoken:' + (props.sessionId || 'global')
+      const playedFor = (sessionId) => {
+        const key = 'breeze-tts:spoken:' + (sessionId || 'global')
         let stored = null
         try {
           stored = JSON.parse(window.localStorage.getItem(key) || 'null')
         } catch {
           stored = null
         }
-        played.current = {
-          key,
-          ids: new Set(Array.isArray(stored) ? stored : []),
-          texts: new Map(),
-        }
+        return { key, ids: new Set(Array.isArray(stored) ? stored : []), texts: new Map() }
       }
+      const playedSession = React.useRef(props.sessionId || 'global')
+      const played = React.useRef(null)
+      if (!played.current) played.current = playedFor(props.sessionId)
       const markSpoken = (id, text) => {
         played.current.ids.add(id)
         if (text) played.current.texts.set(text.slice(0, 80), Date.now())
@@ -603,17 +676,10 @@ function cleanForSpeech(text, keepTags) {
         }
       }
       const primed = React.useRef(false)
-      const debounce = React.useRef(null)
       const warned = React.useRef(false)
-      const turnSignal = (value) => Boolean(value && value.turnEnds && typeof value.turnEnds.has === 'function')
-      const turnFinished = (value, node) => {
-        if (!turnSignal(value)) return false
-        if (node.turn === undefined || node.turn === null) return false
-        return value.turnEnds.has(node.turn)
-      }
       const focused = React.useRef(true)
       const snapshot = typeof props.useChat === 'function'
-        ? props.useChat((value) => (value && typeof value === 'object' ? value.legacy : undefined))
+        ? props.useChat((value) => (value && typeof value === 'object' ? value : undefined))
         : undefined
 
       React.useEffect(() => {
@@ -641,110 +707,95 @@ function cleanForSpeech(text, keepTags) {
         }
       }, [])
 
+      const gate = React.useRef(null)
+      const pendingId = React.useRef("")
+      if (!gate.current) gate.current = createTurnTimer()
+
       React.useEffect(() => {
-        const nodes = snapshot && Array.isArray(snapshot.nodes) ? snapshot.nodes : []
-        if (!snapshot) return
+        gate.current.invalidate()
+        if (playedSession.current !== (props.sessionId || "global")) {
+          playedSession.current = props.sessionId || "global"
+          played.current = playedFor(props.sessionId)
+          primed.current = false
+          warned.current = false
+        }
+        return () => {
+          gate.current.invalidate()
+          pendingId.current = ""
+        }
+      }, [props.sessionId])
+
+      React.useEffect(() => {
+        if (!snapshot) {
+          gate.current.clear()
+          pendingId.current = ""
+          return undefined
+        }
+        const view = snapshot
+        const token = gate.current.generation()
+        const legacy = view.legacy
+        const nodes = legacy && Array.isArray(legacy.nodes) ? legacy.nodes : []
 
         if (!primed.current) {
-          if (!nodes.length) return
+          if (!nodes.length) return undefined
           primed.current = true
           for (const node of nodes) {
             const id = node && (node.id || node.messageId || (node.message && node.message.id))
-            if (id) markSpoken(id, '')
+            if (id) markSpoken(id, "")
           }
-          return
+          return undefined
         }
 
-        if (!turnSignal(snapshot)) {
-          if (!warned.current) {
-            warned.current = true
-            fetch('/breeze-tts/log', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ msg: 'auto-speak disabled: no turnEnds signal in this build' }),
-            }).catch(() => {})
-          }
-          return
-        }
-        if (snapshot.partial) return
-        if (Array.isArray(snapshot.runningCalls) && snapshot.runningCalls.length > 0) return
-
-        if (debounce.current) window.clearTimeout(debounce.current)
-        debounce.current = window.setTimeout(evaluate, 400)
-        return
-
-        function evaluate() {
-        let text = ''
-        let measure = ''
-        let id = ''
-        for (let index = nodes.length - 1; index >= 0; index -= 1) {
-          const node = nodes[index]
-          if (!node || typeof node !== 'object') continue
-          if (String(node.kind || '') !== 'assistant') continue
-          if (node.interrupted === true) continue
-          if (!turnFinished(snapshot, node)) continue
-          const candidateId = node.id || node.messageId || (node.message && node.message.id) || ''
-          if (!candidateId || played.current.ids.has(candidateId)) continue
-          let raw = ''
-          let source = 'content'
+        const decision = decideAutoSpeak(view)
+        if (decision.action === "skip" && decision.reason === "no-turn-signal" && !warned.current) {
+          warned.current = true
           try {
-            const message = node.message && typeof node.message === 'object' ? node.message : node
-            raw = textBlocks(message.content, []).join(' ')
-            if (!raw) {
-              raw = collectText(node, [], 0).join(' ')
-              source = 'collect'
-            }
-          } catch {
-            raw = ''
-          }
-          const spokenText = cleanForSpeech(raw, true)
-          const plain = cleanForSpeech(raw)
-          if (!plain) continue
-          const recent = played.current.texts.get(plain.slice(0, 80))
-          if (recent && Date.now() - recent < 60000) {
-            markSpoken(candidateId, '')
-            continue
-          }
-          text = spokenText
-          measure = plain
-          id = candidateId
-          try {
-            const node2 = node
-            const blocks = node2 && node2.message && Array.isArray(node2.message.content) ? node2.message.content : (Array.isArray(node2.blocks) ? node2.blocks : [])
-            const kinds = blocks.slice(0, 6).map((b) => String((b && (b.type || b.kind)) || '?')).join(',')
-            fetch('/breeze-tts/log', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ msg: 'speak src=' + source + ' id=' + candidateId.slice(0, 18) + ' len=' + plain.length + ' kinds=' + kinds }),
+            fetch(ENDPOINT + "/log", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ msg: "auto-speak disabled: " + decision.reason }),
             }).catch(() => {})
-          } catch {
-            /* logging must never break playback */
+          } catch (error) {
+            /* logging must never break the chip */
           }
-          break
+          return undefined
         }
-        if (!id) {
-          const last = nodes[nodes.length - 1]
-          const shape = last && typeof last === 'object' ? Object.keys(last).slice(0, 10).join(',') : 'none'
-          const kind = last && typeof last === 'object' ? String(last.kind || last.type || '?') : '?'
-          const blocks = last && Array.isArray(last.blocks) ? last.blocks : []
-          const probe = blocks[0] && typeof blocks[0] === 'object'
-            ? Object.keys(blocks[0]).slice(0, 8).join(',') + '|type=' + String(blocks[0].type || blocks[0].kind || '?')
-            : 'none'
-          return
+        if (decision.action !== "candidate") {
+          gate.current.clear()
+          pendingId.current = ""
+          return undefined
         }
-        markSpoken(id, text)
+        if (played.current.ids.has(decision.id)) return undefined
+        if (pendingId.current === decision.id) return undefined
 
-        api('/status')
-          .then((data) => {
-            const limit = Number((data && data.autoSpeakMaxChars) || 0)
-            if (!data || !data.autoSpeak) return null
-            if (limit <= 0) return null
-            if (measure.length > limit) return null
-            if (!data.backgroundPlay && !focused.current) return null
-            return speakRemotely({ text }, { host: true })
-          })
-          .catch(() => {})
+        const spokenText = cleanForSpeech(decision.text, true)
+        const plain = cleanForSpeech(decision.text)
+        if (!plain) return undefined
+        const recent = played.current.texts.get(plain.slice(0, 80))
+        if (recent && Date.now() - recent < 60000) {
+          markSpoken(decision.id, "")
+          return undefined
         }
+
+        gate.current.clear()
+        pendingId.current = decision.id
+        gate.current.schedule(token, 400, () => {
+          if (gate.current.generation() !== token) return
+          markSpoken(decision.id, spokenText)
+          api("/status")
+            .then((data) => {
+              if (gate.current.generation() !== token) return null
+              const limit = Number((data && data.autoSpeakMaxChars) || 0)
+              if (!data || !data.autoSpeak) return null
+              if (limit <= 0) return null
+              if (plain.length > limit) return null
+              if (!data.backgroundPlay && !focused.current) return null
+              return speakRemotely({ text: spokenText }, { host: true })
+            })
+            .catch(() => {})
+        })
+
+        return undefined
       }, [snapshot])
 
       const data = state.data
@@ -1613,6 +1664,7 @@ function cleanForSpeech(text, keepTags) {
           locale: NS,
         }, (props) => h(AutoSpeakChip, Object.assign({}, props, { t }))))
       },
+      __test: { decideAutoSpeak, createTurnTimer },
     }
   },
 })
