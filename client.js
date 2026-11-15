@@ -660,20 +660,31 @@ function cleanForSpeech(text, keepTags) {
         } catch {
           stored = null
         }
-        return { key, ids: new Set(Array.isArray(stored) ? stored : []), texts: new Map() }
+        const list = Array.isArray(stored) ? stored : (stored && Array.isArray(stored.ids) ? stored.ids : [])
+        const skippedList = stored && Array.isArray(stored.skipped) ? stored.skipped : []
+        return { key, ids: new Set(list), skipped: new Set(skippedList), texts: new Map() }
       }
       const playedSession = React.useRef(props.sessionId || 'global')
       const played = React.useRef(null)
       if (!played.current) played.current = playedFor(props.sessionId)
+      const persist = () => {
+        try {
+          window.localStorage.setItem(played.current.key, JSON.stringify({
+            ids: Array.from(played.current.ids).slice(-400),
+            skipped: Array.from(played.current.skipped).slice(-400),
+          }))
+        } catch (error) {
+          /* storage full or disabled */
+        }
+      }
       const markSpoken = (id, text) => {
         played.current.ids.add(id)
         if (text) played.current.texts.set(text.slice(0, 80), Date.now())
-        try {
-          const list = Array.from(played.current.ids).slice(-400)
-          window.localStorage.setItem(played.current.key, JSON.stringify(list))
-        } catch {
-          /* storage full or disabled */
-        }
+        persist()
+      }
+      const markSkipped = (id) => {
+        played.current.skipped.add(id)
+        persist()
       }
       const primed = React.useRef(false)
       const warned = React.useRef(false)
@@ -709,6 +720,9 @@ function cleanForSpeech(text, keepTags) {
 
       const gate = React.useRef(null)
       const pendingId = React.useRef("")
+      const retryAt = React.useRef(new Map())
+      const retryCounts = React.useRef(new Map())
+      const [tick, setTick] = React.useState(0)
       if (!gate.current) gate.current = createTurnTimer()
 
       React.useEffect(() => {
@@ -725,14 +739,63 @@ function cleanForSpeech(text, keepTags) {
         }
       }, [props.sessionId])
 
+      const attempt = async (id, spokenText, plain, token) => {
+        if (gate.current.generation() !== token) {
+          if (pendingId.current === id) pendingId.current = ""
+          return
+        }
+        let data = null
+        try {
+          data = await api("/status")
+        } catch (error) {
+          data = null
+        }
+        if (gate.current.generation() !== token) {
+          if (pendingId.current === id) pendingId.current = ""
+          return
+        }
+        if (!data) {
+          retryLater(id)
+          if (pendingId.current === id) pendingId.current = ""
+          return
+        }
+        const limit = Number(data.autoSpeakMaxChars || 0)
+        const refused = !data.autoSpeak
+          || limit <= 0
+          || plain.length > limit
+          || (!data.backgroundPlay && !focused.current)
+        if (refused) {
+          markSkipped(id)
+          if (pendingId.current === id) pendingId.current = ""
+          return
+        }
+        try {
+          await speakRemotely({ text: spokenText }, { host: true })
+          markSpoken(id, spokenText)
+        } catch (error) {
+          retryLater(id)
+        }
+        if (pendingId.current === id) pendingId.current = ""
+      }
+
+      const retryLater = (id) => {
+        const attempts = (retryCounts.current.get(id) || 0) + 1
+        retryCounts.current.set(id, attempts)
+        if (attempts >= 3) {
+          markSkipped(id)
+          return
+        }
+        retryAt.current.set(id, Date.now() + 3000 * attempts)
+        window.setTimeout(() => setTick((value) => value + 1), 3000 * attempts + 20)
+      }
+
       React.useEffect(() => {
         if (!snapshot) {
-          gate.current.clear()
+          gate.current.invalidate()
           pendingId.current = ""
           return undefined
         }
         const view = snapshot
-        const token = gate.current.generation()
         const legacy = view.legacy
         const nodes = legacy && Array.isArray(legacy.nodes) ? legacy.nodes : []
 
@@ -747,56 +810,52 @@ function cleanForSpeech(text, keepTags) {
         }
 
         const decision = decideAutoSpeak(view)
-        if (decision.action === "skip" && decision.reason === "no-turn-signal" && !warned.current) {
-          warned.current = true
-          try {
-            fetch(ENDPOINT + "/log", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ msg: "auto-speak disabled: " + decision.reason }),
-            }).catch(() => {})
-          } catch (error) {
-            /* logging must never break the chip */
+        if (decision.action === "skip" && decision.reason === "no-turn-signal") {
+          gate.current.invalidate()
+          pendingId.current = ""
+          if (!warned.current) {
+            warned.current = true
+            try {
+              fetch(ENDPOINT + "/log", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ msg: "auto-speak disabled: " + decision.reason }),
+              }).catch(() => {})
+            } catch (error) {
+              /* logging must never break the chip */
+            }
           }
           return undefined
         }
         if (decision.action !== "candidate") {
-          gate.current.clear()
+          gate.current.invalidate()
           pendingId.current = ""
           return undefined
         }
-        if (played.current.ids.has(decision.id)) return undefined
+        if (played.current.ids.has(decision.id) || played.current.skipped.has(decision.id)) {
+          if (pendingId.current === decision.id) pendingId.current = ""
+          return undefined
+        }
         if (pendingId.current === decision.id) return undefined
+        if ((retryAt.current.get(decision.id) || 0) > Date.now()) return undefined
 
         const spokenText = cleanForSpeech(decision.text, true)
         const plain = cleanForSpeech(decision.text)
         if (!plain) return undefined
         const recent = played.current.texts.get(plain.slice(0, 80))
         if (recent && Date.now() - recent < 60000) {
-          markSpoken(decision.id, "")
+          markSkipped(decision.id)
           return undefined
         }
 
-        gate.current.clear()
+        gate.current.invalidate()
+        const token = gate.current.generation()
         pendingId.current = decision.id
         gate.current.schedule(token, 400, () => {
-          if (gate.current.generation() !== token) return
-          markSpoken(decision.id, spokenText)
-          api("/status")
-            .then((data) => {
-              if (gate.current.generation() !== token) return null
-              const limit = Number((data && data.autoSpeakMaxChars) || 0)
-              if (!data || !data.autoSpeak) return null
-              if (limit <= 0) return null
-              if (plain.length > limit) return null
-              if (!data.backgroundPlay && !focused.current) return null
-              return speakRemotely({ text: spokenText }, { host: true })
-            })
-            .catch(() => {})
+          void attempt(decision.id, spokenText, plain, token)
         })
-
         return undefined
-      }, [snapshot])
+      }, [snapshot, tick])
 
       const data = state.data
       if (!data) return null
@@ -1664,7 +1723,7 @@ function cleanForSpeech(text, keepTags) {
           locale: NS,
         }, (props) => h(AutoSpeakChip, Object.assign({}, props, { t }))))
       },
-      __test: { decideAutoSpeak, createTurnTimer },
+      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip },
     }
   },
 })

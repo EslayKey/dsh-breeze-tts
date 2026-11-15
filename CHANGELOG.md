@@ -22,6 +22,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 - Synthesis now runs one call at a time, so two concurrent requests can no longer both pass the daily check; the settings file also has a single write lock
 - `languageMode: 'en'|'zh'` works again (a non-auto mode is the language itself); the language actually sent is what the cache key and the budget use
 
+### Fixed (auto-speak lifecycle)
+- A `/status` already in flight is abandoned when the same session starts a new stream, the signal disappears or the candidate is replaced; only identical re-renders keep waiting
+- A message is marked spoken only after playback succeeds, so a failed `/status` or play is retried with backoff (three attempts) instead of being recorded
+- Replies skipped by settings (auto-speak off, over the limit, background) are recorded as skipped and never replayed later
+
 ### Fixed (auto-speak completion)
 - Speech now requires the recorded turn end reason to be `completed`; error, aborted, interrupted and unknown endings never speak
 - A pending 400 ms timer is cancelled on every render and on session switch, and a late `/status` reply is discarded, so the previous session can no longer be spoken
@@ -32,7 +37,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 - `play:true` with a `.mp3` save path synthesised WAV and handed it to the player; it is now refused before any request
 
 ### Added
-- `plan.js` with offline tests: `plan`, `concurrency`, `tool`, `autospeak`, `autospeak-timer`, `tts_speak` (45 checks)
+- `plan.js` with offline tests: `plan`, `concurrency`, `tool`, `autospeak`, `autospeak-timer`, `autospeak-integration`, `tts_speak` (49 checks)
 
 
 ## [1.0.5] - 2026-10-31
