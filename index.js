@@ -914,7 +914,7 @@ export function apply(ctx, config) {
                   }))
                   .slice(0, 40)
               }
-              if (typeof body.previewText === 'string' && body.previewText) patch.previewText = body.previewText
+              if (typeof body.previewText === 'string') patch.previewText = body.previewText
               if (typeof body.dailyChars === 'number' && body.dailyChars > 0) patch.dailyChars = Math.floor(body.dailyChars)
               if (typeof body.autoSpeak === 'boolean') patch.autoSpeak = body.autoSpeak
               if (typeof body.backgroundPlay === 'boolean') patch.backgroundPlay = body.backgroundPlay

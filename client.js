@@ -22,10 +22,11 @@ window.__ModuleLoader__.load({
         },
 
         label: {
-          voice: '音色', mood: '情绪', previewText: '试听文案', dailyLimit: '每日字数上限',
-          balance: '剩余额度', todayUsage: '今日已用', preview: '试听', save: '保存设置',
+          voice: '音色', mood: '默认语气', previewText: '试听文案', dailyLimit: '每日字数上限',
+          balance: 'Breeze 余额', todayUsage: '今日朗读字数', preview: '试听', save: '保存设置',
           saving: '保存中…', synthesizing: '合成中…', refresh: '刷新', designed: '自捏',
           readAloud: '朗读这条', replay: '重播上一条', replayEmpty: '还没有可重播的音频', saved: '已保存 ✓',
+          unsaved: '有未保存的更改', invalidDailyLimit: '每日字数上限至少为 1 字',
         },
         status: { ready: '就绪', missingKey: '缺少 API key', credits: 'credits', chars: '字' },
         hint: { key: '把 Breeze API key 写进 ~/.dsh/breeze.json 的 apiKey 字段。', limit: '超过上限会拒绝合成，避免意外烧额度。' },
@@ -36,13 +37,17 @@ window.__ModuleLoader__.load({
           voiceManageHint: '只有你自己生成的音色可以在这里改名或删除',
           apiKey: 'API Key',
           keyBound: '已连接',
+          keyUnverified: '已保存，暂无法验证',
           keyMissing: '尚未连接，填入 Breeze 的 API key 后点连接',
           keyRequired: '请先填入 API key',
           keyConnected: '连接成功',
           keyDisconnected: '已断开',
           connect: '连接',
+          changeKey: '更换 API Key',
+          manageKey: '管理',
+          closeKey: '收起',
           disconnect: '断开',
-          cloneNotice: '本插件不提供音色克隆。需要克隆自己的声音，请到 Breeze 官网的音色库创建，克隆好的音色会自动出现在上面的列表里。',
+          cloneNotice: '在 Breeze 官网克隆的音色会出现在音色列表中。',
           renameVoice: '重命名',
           renamePlaceholder: '新的音色名称',
           saveName: '保存名称',
@@ -54,6 +59,7 @@ window.__ModuleLoader__.load({
           voiceRemoved: '已从音色库移除',
           emotionMode: '语气模式',
           emotionSaved: '语气模式已切换',
+          emotionImmediate: '切换后立即生效',
           emotionFixed: '固定',
           emotionInfer: '智能推断',
           emotionMarker: '模型标注',
@@ -62,7 +68,7 @@ window.__ModuleLoader__.load({
           emotionMarkerHint: '回复中的表情标记指定接下来一段的朗读语气。分段越多，合成越慢。',
           emotionMarkerNote: '模型标注是实验功能。模型可能漏标、选错语气或输出不完整的标记。',
           publicVoices: '公开音色',
-          publicVoicesHint: '插件默认只显示你自建的音色，公共目录另外浏览',
+          publicVoicesHint: '从 Breeze 公共音色库添加音色。',
           openLibrary: '更多公开音色',
           collapseLibrary: '收起音色库',
           libraryTitle: '官方音色库',
@@ -126,27 +132,32 @@ window.__ModuleLoader__.load({
         },
 
         label: {
-          voice: 'Voice', mood: 'Mood', previewText: 'Preview line', dailyLimit: 'Daily character limit',
-          balance: 'Credits left', todayUsage: 'Used today', preview: 'Preview', save: 'Save settings',
+          voice: 'Voice', mood: 'Default tone', previewText: 'Preview line', dailyLimit: 'Daily character limit',
+          balance: 'Breeze balance', todayUsage: 'Characters read today', preview: 'Preview', save: 'Save settings',
           saving: 'Saving…', synthesizing: 'Synthesizing…', refresh: 'Refresh', designed: 'Designed',
           readAloud: 'Read aloud', replay: 'Replay', replayEmpty: 'Nothing to replay yet', saved: 'Saved ✓',
+          unsaved: 'Unsaved changes', invalidDailyLimit: 'Set a daily limit of at least 1 character',
         },
         status: { ready: 'Ready', missingKey: 'Missing API key', credits: 'credits', chars: 'chars' },
         hint: { key: 'Write the Breeze API key into apiKey of ~/.dsh/breeze.json.', limit: 'Synthesis is refused past the limit so credits cannot run away.' },
         extra: {
           apiKey: 'API key',
           keyBound: 'Connected',
+          keyUnverified: 'Key saved, connection unverified',
           keyMissing: 'Not connected. Paste your Breeze API key and press Connect.',
           keyRequired: 'Enter an API key first',
           keyConnected: 'Connected',
           keyDisconnected: 'Disconnected',
           connect: 'Connect',
+          changeKey: 'Replace API key',
+          manageKey: 'Manage',
+          closeKey: 'Close',
           disconnect: 'Disconnect',
           autoSpeak: 'Auto speak',
           autoSpeakHint: 'Automatically read new replies within the configured character limit. Off by default.',
           renameBlocked: 'Built-in and public voices cannot be renamed',
           voiceManageHint: 'Only voices you created can be renamed or deleted here',
-          cloneNotice: 'Voice cloning is not part of this plugin. Create a clone on the Breeze website and it will show up in the list above.',
+          cloneNotice: 'Voices cloned on the Breeze website appear in the voice list.',
           renameVoice: 'Rename',
           renamePlaceholder: 'New voice name',
           saveName: 'Save name',
@@ -158,6 +169,7 @@ window.__ModuleLoader__.load({
           voiceRemoved: 'Removed from your voices',
           emotionMode: 'Tone mode',
           emotionSaved: 'Tone mode switched',
+          emotionImmediate: 'Applies immediately',
           emotionFixed: 'Fixed',
           emotionInfer: 'Infer',
           emotionMarker: 'Model tagged',
@@ -166,7 +178,7 @@ window.__ModuleLoader__.load({
           emotionMarkerHint: 'Emoji markers in the reply select the spoken tone for the next segment. More segments take longer to synthesize.',
           emotionMarkerNote: 'Model tagging is experimental. The model may omit a marker, pick the wrong tone, or emit an incomplete marker.',
           publicVoices: 'Public voices',
-          publicVoicesHint: 'Only your own voices are listed by default; the public catalog is browsed separately',
+          publicVoicesHint: 'Add voices from the Breeze public library.',
           openLibrary: 'Browse public voices',
           collapseLibrary: 'Collapse library',
           libraryTitle: 'Public voice library',
@@ -405,6 +417,8 @@ window.__ModuleLoader__.load({
         '.dsh-breeze-row:first-of-type{border-top:0}',
         '.dsh-breeze-key{flex:0 0 132px;font-size:13px;color:' + COLOR.secondary + '}',
         '.dsh-breeze-value{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+        '.dsh-breeze-key-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}',
+        '.dsh-breeze-savebar{position:sticky;bottom:0;z-index:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid ' + COLOR.border + ';background:' + COLOR.surface + ';box-shadow:0 32px 0 ' + COLOR.surface + ';padding:10px 0;margin-top:16px}',
         '.dsh-breeze-control{font:inherit;font-size:13px;height:30px;padding:0 10px;border-radius:8px;border:1px solid ' + COLOR.borderStrong + ';background:' + COLOR.nested + ';color:' + COLOR.primary + ';min-width:0}',
         '.dsh-breeze-control:focus-visible{outline:2px solid ' + COLOR.brand + ';outline-offset:1px}',
         '.dsh-breeze-chip{font:inherit;font-size:12px;height:26px;padding:0 10px;border-radius:999px;border:0;background:color-mix(in srgb,' + COLOR.primary + ' 9%,transparent);color:' + COLOR.secondary + ';cursor:pointer}',
@@ -427,19 +441,23 @@ window.__ModuleLoader__.load({
 
     function useStatus() {
       const [state, setState] = React.useState({ loading: true, data: null, error: null })
-      const load = React.useCallback(async (rethrow) => {
+      const load = React.useCallback(async () => {
         try {
           const data = await api('/status')
           setState({ loading: false, data, error: null })
           return data
         } catch (error) {
-          setState({ loading: false, data: null, error: error instanceof Error ? error.message : String(error) })
-          if (rethrow) throw error
+          setState((previous) => ({ ...previous, loading: false, error: error instanceof Error ? error.message : String(error) }))
           return null
         }
       }, [])
+      const update = React.useCallback((patch) => {
+        setState((previous) => previous.data
+          ? { ...previous, data: { ...previous.data, ...patch } }
+          : previous)
+      }, [])
       React.useEffect(() => { load() }, [load])
-      return [state, load]
+      return [state, load, update]
     }
 
     const SKIP_TYPES = ["reasoning", "thinking", "reasoning-delta", "thinking-delta", "redacted-thinking"]
@@ -956,17 +974,14 @@ function cleanForSpeech(text, keepTags) {
 
     function SettingsPage(props) {
       const t = props.t
-      const [state, reload] = useStatus()
+      const [state, reload, updateStatus] = useStatus()
       const [voices, setVoices] = React.useState([])
-      const [voiceId, setVoiceId] = React.useState('')
-      const [moodId, setMoodId] = React.useState('normal')
-      const [emotionMode, setEmotionMode] = React.useState('fixed')
-      const [tones, setTones] = React.useState([])
-      const [savedVoices, setSavedVoices] = React.useState([])
+      const [draft, setDraft] = React.useState({})
       const [voiceRenameOpen, setVoiceRenameOpen] = React.useState(false)
       const [voiceNameDraft, setVoiceNameDraft] = React.useState('')
       const [designName, setDesignName] = React.useState('')
       const [apiKeyInput, setApiKeyInput] = React.useState('')
+      const [manageKeyOpen, setManageKeyOpen] = React.useState(false)
       const [connectNote, setConnectNote] = React.useState(null)
       const [voiceNames, setVoiceNames] = React.useState({})
       const [libraryOpen, setLibraryOpen] = React.useState(false)
@@ -975,38 +990,60 @@ function cleanForSpeech(text, keepTags) {
       const [toneEditId, setToneEditId] = React.useState('')
       const [toneDraftName, setToneDraftName] = React.useState('')
       const [toneDraftText, setToneDraftText] = React.useState('')
-      const [previewText, setPreviewText] = React.useState('')
-      const [dailyChars, setDailyChars] = React.useState(1500)
-      const [autoSpeak, setAutoSpeak] = React.useState(false)
-      const [autoMax, setAutoMax] = React.useState(120)
-      const [backgroundPlay, setBackgroundPlay] = React.useState(false)
-      const [customMood, setCustomMood] = React.useState('')
       const [designDesc, setDesignDesc] = React.useState('')
       const [designText, setDesignText] = React.useState('')
       const [candidates, setCandidates] = React.useState([])
       const [phase, setPhase] = React.useState('idle')
       const [notice, setNotice] = React.useState('')
+      const [saveNote, setSaveNote] = React.useState(null)
+      const [modeNote, setModeNote] = React.useState(null)
+      const [designNote, setDesignNote] = React.useState('')
       const [refreshNote, setRefreshNote] = React.useState({ text: '', tone: 'muted' })
 
-      React.useEffect(() => {
-        const data = state.data
-        if (!data) return
-        setVoiceId(data.voiceId || '')
-        setMoodId(data.moodId || 'normal')
-        setEmotionMode(data.emotionMode || 'fixed')
-        setTones(Array.isArray(data.tones) ? data.tones : [])
-        setSavedVoices(Array.isArray(data.savedVoices) ? data.savedVoices : [])
-        setPreviewText(data.previewText || '')
-        setDailyChars(data.today ? data.today.limit : 1500)
-        setAutoSpeak(Boolean(data.autoSpeak))
-        setAutoMax(Number(data.autoSpeakMaxChars || 120))
-        setBackgroundPlay(Boolean(data.backgroundPlay))
-        setCustomMood(String(data.customMood || ''))
-      }, [state.data])
+      const data = state.data
+      const hasKey = Boolean(data?.hasKey)
+      const storedSettings = {
+        voiceId: data?.voiceId || '',
+        moodId: data?.moodId || 'normal',
+        previewText: data?.previewText ?? '',
+        dailyChars: String(data?.today?.limit ?? 1500),
+        autoSpeak: Boolean(data?.autoSpeak),
+        autoSpeakMaxChars: Number(data?.autoSpeakMaxChars ?? 120),
+        backgroundPlay: Boolean(data?.backgroundPlay),
+      }
+      const { voiceId, moodId, previewText, dailyChars, autoSpeak, autoSpeakMaxChars: autoMax, backgroundPlay } = {
+        ...storedSettings, ...draft,
+      }
+      const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => !Object.is(value, storedSettings[key])))
+      const dirty = Object.keys(changes).length > 0
+      const emotionMode = data?.emotionMode || 'fixed'
+      const tones = Array.isArray(data?.tones) ? data.tones : []
+      const savedVoices = Array.isArray(data?.savedVoices) ? data.savedVoices : []
 
-      const hasKey = Boolean(state.data && state.data.hasKey)
+      const editSetting = (key, value) => {
+        setDraft((previous) => {
+          const next = { ...previous, [key]: value }
+          if (phase !== 'save' && Object.is(value, storedSettings[key])) delete next[key]
+          return next
+        })
+        setSaveNote(null)
+      }
+
+      const clearDraftField = (key) => {
+        setDraft((previous) => {
+          if (!Object.hasOwn(previous, key)) return previous
+          const next = { ...previous }
+          delete next[key]
+          return next
+        })
+        setSaveNote(null)
+      }
+
       React.useEffect(() => {
-        if (!hasKey) return undefined
+        if (!hasKey) {
+          setVoices([])
+          return undefined
+        }
         let alive = true
         api('/voices')
           .then((data) => { if (alive) setVoices(data.voices || []) })
@@ -1014,12 +1051,11 @@ function cleanForSpeech(text, keepTags) {
         return () => { alive = false }
       }, [hasKey])
 
-      const data = state.data
       const presets = data && Array.isArray(data.voicePresets) ? data.voicePresets : []
       const extra = voices.filter((voice) => !presets.some((preset) => preset.voiceId === voice.voiceId))
       const balance = data && typeof data.balance === 'number' ? data.balance : null
       const used = data && data.today ? data.today.chars : 0
-      const limit = data && data.today ? data.today.limit : dailyChars
+      const limit = data?.today?.limit ?? Number(storedSettings.dailyChars)
 
       const connectKey = async () => {
         const key = apiKeyInput.trim()
@@ -1036,13 +1072,16 @@ function cleanForSpeech(text, keepTags) {
             body: JSON.stringify({ apiKey: key }),
           })
           setApiKeyInput('')
+          setManageKeyOpen(false)
           setConnectNote({
             tone: 'ok',
             text: t('extra.keyConnected') + (typeof result.balance === 'number' ? ' · ' + result.balance.toFixed(1) + ' ' + t('status.credits') : ''),
           })
-          reload()
-          const freshVoices = await api('/voices').catch(() => null)
-          if (freshVoices && Array.isArray(freshVoices.voices)) setVoices(freshVoices.voices)
+          await reload()
+          if (hasKey) {
+            const freshVoices = await api('/voices').catch(() => null)
+            if (freshVoices && Array.isArray(freshVoices.voices)) setVoices(freshVoices.voices)
+          }
         } catch (error) {
           setConnectNote({ tone: 'error', text: humanError(t, error) })
         }
@@ -1054,8 +1093,10 @@ function cleanForSpeech(text, keepTags) {
         setConnectNote(null)
         try {
           await api('/disconnect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+          setApiKeyInput('')
+          setManageKeyOpen(false)
           setConnectNote({ tone: 'muted', text: t('extra.keyDisconnected') })
-          reload()
+          await reload()
         } catch (error) {
           setConnectNote({ tone: 'error', text: humanError(t, error) })
         }
@@ -1076,31 +1117,34 @@ function cleanForSpeech(text, keepTags) {
       }
 
       const save = async () => {
+        if (!data || !dirty || phase !== 'idle') return
+        const patch = { ...changes }
+        if (Object.hasOwn(patch, 'dailyChars')) {
+          const dailyLimit = Math.floor(Number(patch.dailyChars))
+          if (!Number.isFinite(dailyLimit) || dailyLimit < 1) {
+            setSaveNote({ text: t('label.invalidDailyLimit'), error: true })
+            return
+          }
+          patch.dailyChars = dailyLimit
+        }
         setPhase('save')
-        setNotice('')
+        setSaveNote(null)
         try {
-          await api('/settings', {
+          const result = await api('/settings', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              voiceId,
-              moodId,
-              emotionMode,
-              tones: tones.filter((tone) => !tone.builtin),
-              previewText,
-              dailyChars: Number(dailyChars),
-              autoSpeak,
-              autoSpeakMaxChars: Number(autoMax),
-              backgroundPlay,
-              customMood,
-            }),
+            body: JSON.stringify(patch),
           })
-          setPhase('idle')
-          setNotice(t('label.saved'))
-          reload()
+          const { dailyChars: savedLimit, ...saved } = result.saved
+          if (savedLimit !== undefined) saved.today = { ...data.today, limit: savedLimit }
+          updateStatus(saved)
+          setDraft((current) => Object.fromEntries(Object.entries(current).filter(([key, value]) =>
+            !Object.hasOwn(result.saved, key) || !Object.is(value, changes[key]))))
+          setSaveNote({ text: t('label.saved'), error: false })
         } catch (error) {
+          setSaveNote({ text: humanError(t, error), error: true })
+        } finally {
           setPhase('idle')
-          setNotice(humanError(t, error))
         }
       }
 
@@ -1108,19 +1152,39 @@ function cleanForSpeech(text, keepTags) {
         setPhase('refresh')
         setRefreshNote({ text: '', tone: 'muted' })
         try {
-          const fresh = await reload(true)
-          setPhase('idle')
+          const fresh = await api('/status')
+          updateStatus({ today: fresh.today, balance: fresh.error ? balance : fresh.balance })
+          if (fresh.error) throw new Error(fresh.error)
           const credits = fresh && typeof fresh.balance === 'number' ? ' · ' + fresh.balance.toFixed(1) + ' ' + t('status.credits') : ''
           setRefreshNote({ text: t('extra.refreshed') + credits, tone: 'ok' })
         } catch (error) {
-          setPhase('idle')
           setRefreshNote({ text: t('extra.refreshFailed') + ': ' + humanError(t, error), tone: 'error' })
+        } finally {
+          setPhase('idle')
+        }
+      }
+
+      const changeEmotionMode = async (next) => {
+        setPhase('emotionMode')
+        setModeNote(null)
+        try {
+          const result = await api('/settings', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ emotionMode: next }),
+          })
+          updateStatus({ emotionMode: result.saved.emotionMode })
+          setModeNote({ text: t('extra.emotionSaved'), error: false })
+        } catch (error) {
+          setModeNote({ text: humanError(t, error), error: true })
+        } finally {
+          setPhase('idle')
         }
       }
 
       const generate = async () => {
         setPhase('design')
-        setNotice('')
+        setDesignNote('')
         setCandidates([])
         try {
           const result = await api('/design', {
@@ -1130,16 +1194,16 @@ function cleanForSpeech(text, keepTags) {
           })
           setCandidates(result.candidates || [])
           setPhase('idle')
-          if (!result.candidates || !result.candidates.length) setNotice(t('extra.designEmpty'))
+          if (!result.candidates || !result.candidates.length) setDesignNote(t('extra.designEmpty'))
         } catch (error) {
           setPhase('idle')
-          setNotice(humanError(t, error))
+          setDesignNote(humanError(t, error))
         }
       }
 
       const saveCandidate = async (candidate) => {
         setPhase('saveVoice')
-        setNotice('')
+        setDesignNote('')
         try {
           const result = await api('/save-voice', {
             method: 'POST',
@@ -1150,17 +1214,18 @@ function cleanForSpeech(text, keepTags) {
               description: designDesc,
             }),
           })
-          setPhase('idle')
           if (result.voiceId) {
-            setVoiceId(result.voiceId)
-            setNotice(t('extra.voiceSaved'))
-            reload()
+            updateStatus({ voiceId: result.voiceId })
+            clearDraftField('voiceId')
+            setDesignNote(t('extra.voiceSaved'))
+            await reload()
             const fresh = await api('/voices').catch(() => null)
             if (fresh && Array.isArray(fresh.voices)) setVoices(fresh.voices)
           }
         } catch (error) {
+          setDesignNote(humanError(t, error))
+        } finally {
           setPhase('idle')
-          setNotice(humanError(t, error))
         }
       }
 
@@ -1182,17 +1247,21 @@ function cleanForSpeech(text, keepTags) {
             language: voice.language || '',
             description: voice.description || '',
           }])
-        setSavedVoices(next)
-        setVoiceId(voice.voiceId)
-        setNotice(t('extra.voiceAdded'))
+        setPhase('loadVoice')
+        setNotice('')
         try {
-          await api('/settings', {
+          const result = await api('/settings', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ savedVoices: next }),
           })
+          updateStatus({ savedVoices: result.saved.savedVoices })
+          editSetting('voiceId', voice.voiceId)
+          setNotice(t('extra.voiceAdded'))
         } catch (error) {
           setNotice(humanError(t, error))
+        } finally {
+          setPhase('idle')
         }
       }
 
@@ -1295,8 +1364,8 @@ function cleanForSpeech(text, keepTags) {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ moodId: id, tones: next.filter((tone) => !tone.builtin) }),
           })
-          setTones(next)
-          setMoodId(id)
+          updateStatus({ tones: next, moodId: id })
+          clearDraftField('moodId')
           setToneEditor(false)
           setPhase('idle')
           setNotice(t('extra.toneSaved'))
@@ -1317,8 +1386,8 @@ function cleanForSpeech(text, keepTags) {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ moodId: 'normal', tones: next.filter((tone) => !tone.builtin) }),
           })
-          setTones(next)
-          setMoodId('normal')
+          updateStatus({ tones: next, moodId: 'normal' })
+          clearDraftField('moodId')
           setPhase('idle')
           setNotice(t('extra.toneDeleted'))
         } catch (error) {
@@ -1339,8 +1408,16 @@ function cleanForSpeech(text, keepTags) {
           })
           setPhase('idle')
           setNotice(savedVoice ? t('extra.voiceRemoved') : t('extra.voiceDeleted'))
-          if (savedVoice) setSavedVoices(savedVoices.filter((item) => item.voiceId !== voiceId))
-          setVoiceId(presets.length ? presets[0].voiceId : '')
+          const fallback = presets[0]?.voiceId || ''
+          const patch = {}
+          if (savedVoice) patch.savedVoices = savedVoices.filter((item) => item.voiceId !== voiceId)
+          if (voiceId === storedSettings.voiceId) {
+            patch.voiceId = fallback
+            clearDraftField('voiceId')
+          } else {
+            editSetting('voiceId', fallback)
+          }
+          updateStatus(patch)
           const fresh = await api('/voices').catch(() => null)
           if (fresh && Array.isArray(fresh.voices)) setVoices(fresh.voices)
         } catch (error) {
@@ -1374,39 +1451,56 @@ function cleanForSpeech(text, keepTags) {
 
         h('div', { style: { display: 'flex', flexDirection: 'column' } },
           row(t('extra.apiKey'),
-            h('input', {
-              className: 'dsh-breeze-control',
-              style: { flex: 1, minWidth: 220, maxWidth: 360 },
-              type: 'password',
-              placeholder: data && data.hasKey ? t('extra.keyBound') : 'brz_...',
-              value: apiKeyInput,
-              onChange: (event) => setApiKeyInput(event.target.value),
-            }),
-            h('button', {
-              type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
-              onClick: connectKey, disabled: phase === 'connect',
-            }, phase === 'connect' ? Spinner(12) : t('extra.connect')),
-            data && data.hasKey
-              ? h('button', {
-                type: 'button', className: 'dsh-breeze-btn',
-                onClick: disconnectKey, disabled: phase === 'disconnect',
-              }, t('extra.disconnect'))
+            hasKey ? h('span', {
+              style: { fontSize: 12, color: data.ok ? COLOR.success : COLOR.secondary },
+            }, data.ok ? t('extra.keyBound') : t('extra.keyUnverified')) : null,
+            hasKey ? h('button', {
+              type: 'button', className: 'dsh-breeze-btn',
+              'aria-expanded': manageKeyOpen,
+              disabled: phase === 'connect' || phase === 'disconnect',
+              onClick: () => {
+                setManageKeyOpen(!manageKeyOpen)
+                setApiKeyInput('')
+                setConnectNote(null)
+              },
+            }, t(manageKeyOpen ? 'extra.closeKey' : 'extra.manageKey')) : null,
+            !state.loading && (!hasKey || manageKeyOpen)
+              ? h('div', { className: 'dsh-breeze-key-actions' },
+                h('input', {
+                  className: 'dsh-breeze-control',
+                  style: { flex: '1 1 180px', maxWidth: 360 },
+                  type: 'password',
+                  'aria-label': t('extra.apiKey'),
+                  placeholder: 'brz_...',
+                  value: apiKeyInput,
+                  onChange: (event) => setApiKeyInput(event.target.value),
+                }),
+                h('button', {
+                  type: 'button', className: 'dsh-breeze-btn', 'data-primary': hasKey ? 'false' : 'true',
+                  onClick: connectKey, disabled: phase !== 'idle',
+                }, phase === 'connect' ? Spinner(12) : t(hasKey ? 'extra.changeKey' : 'extra.connect')),
+                hasKey ? h('button', {
+                  type: 'button', className: 'dsh-breeze-btn',
+                  onClick: disconnectKey, disabled: phase !== 'idle',
+                }, phase === 'disconnect' ? Spinner(12) : t('extra.disconnect')) : null)
               : null,
-            h('span', {
+            connectNote || (!hasKey && !state.loading) ? h('span', {
+              role: 'status',
               style: {
                 fontSize: 12,
                 color: connectNote
                   ? (connectNote.tone === 'error' ? COLOR.error : connectNote.tone === 'ok' ? COLOR.success : COLOR.secondary)
                   : COLOR.secondary,
               },
-            }, connectNote ? connectNote.text : (data && data.hasKey ? t('extra.keyBound') : t('extra.keyMissing')))),
+            }, connectNote ? connectNote.text : t('extra.keyMissing')) : null),
 
           row(t('label.voice'),
             h('select', {
               className: 'dsh-breeze-control',
-              style: { maxWidth: 340 },
+              style: { maxWidth: 'min(100%, 340px)' },
+              'aria-label': t('label.voice'),
               value: voiceId,
-              onChange: (event) => setVoiceId(event.target.value),
+              onChange: (event) => editSetting('voiceId', event.target.value),
             },
             presets.map((preset) => h('option', { key: preset.voiceId, value: preset.voiceId }, optionLabel(preset))),
             extra.filter((voice) => voice.private).map((voice) => h('option', { key: voice.voiceId, value: voice.voiceId }, optionLabel(voice))),
@@ -1420,13 +1514,13 @@ function cleanForSpeech(text, keepTags) {
               type: 'button',
               className: 'dsh-breeze-btn',
               onClick: startRenameVoice,
-              disabled: !canRenameVoice || phase === 'renameVoice',
+              disabled: !canRenameVoice || phase !== 'idle',
             }, t('extra.renameVoice')),
             h('button', {
               type: 'button',
               className: 'dsh-breeze-btn',
               onClick: removeVoice,
-              disabled: !canDeleteVoice || phase === 'deleteVoice',
+              disabled: !canDeleteVoice || phase !== 'idle',
             }, phase === 'deleteVoice' ? Spinner(12) : t('extra.deleteVoice'))),
 
           voiceRenameOpen
@@ -1440,10 +1534,104 @@ function cleanForSpeech(text, keepTags) {
               }),
               h('button', {
                 type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
-                onClick: renameVoice, disabled: phase === 'renameVoice',
+                onClick: renameVoice, disabled: phase !== 'idle',
               }, phase === 'renameVoice' ? Spinner(12) : t('extra.saveName')),
               h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: () => setVoiceRenameOpen(false) }, t('extra.cancel')))
             : null,
+
+          row(t('label.mood'),
+            h('select', {
+              className: 'dsh-breeze-control',
+              style: { maxWidth: 240 },
+              'aria-label': t('label.mood'),
+              value: moodId,
+              onChange: (event) => editSetting('moodId', event.target.value),
+            },
+            tones.map((tone) => h('option', { key: tone.id, value: tone.id },
+              (tone.builtin ? t('tone.' + tone.id) : tone.name)
+                + (tone.builtin ? '' : ' · ' + t('extra.customTag'))))),
+            h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: startNewTone }, t('extra.newTone')),
+            activeTone && !activeTone.builtin
+              ? h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: startEditTone }, t('extra.editTone'))
+              : null,
+            activeTone && !activeTone.builtin
+              ? h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: removeTone, disabled: phase !== 'idle' }, t('extra.deleteTone'))
+              : null),
+
+          activeTone
+            ? h('div', {
+              style: {
+                marginTop: -4, marginBottom: 6, fontSize: 12, lineHeight: '18px',
+                color: COLOR.secondary, paddingLeft: 144,
+              },
+            }, activeTone.instructions)
+            : null,
+
+          toneEditor
+            ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, margin: '4px 0 10px 144px' } },
+              h('input', {
+                className: 'dsh-breeze-control',
+                style: { maxWidth: 300 },
+                placeholder: t('extra.toneNamePlaceholder'),
+                value: toneDraftName,
+                onChange: (event) => setToneDraftName(event.target.value),
+              }),
+              h('textarea', {
+                className: 'dsh-breeze-control',
+                style: { minHeight: 62, padding: '8px 10px', resize: 'vertical', lineHeight: '20px' },
+                placeholder: t('extra.tonePlaceholder'),
+                maxLength: 500,
+                value: toneDraftText,
+                onChange: (event) => setToneDraftText(event.target.value),
+              }),
+              h('div', { style: { display: 'flex', gap: 8 } },
+                h('button', {
+                  type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
+                  onClick: saveTone, disabled: phase !== 'idle',
+                }, phase === 'saveTone' ? Spinner(12) : t('extra.saveTone')),
+                h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: cancelTone }, t('extra.cancel'))))
+            : null,
+
+          row(t('extra.emotionMode'),
+            h('select', {
+              className: 'dsh-breeze-control',
+              style: { maxWidth: 200 },
+              'aria-label': t('extra.emotionMode'),
+              value: emotionMode,
+              disabled: !data || phase !== 'idle',
+              onChange: (event) => changeEmotionMode(event.target.value),
+            },
+            h('option', { value: 'fixed' }, t('extra.emotionFixed')),
+            h('option', { value: 'infer' }, t('extra.emotionInfer')),
+            h('option', { value: 'marker' }, t('extra.emotionMarker'))),
+            h('span', {
+              role: 'status', style: { fontSize: 12, color: modeNote?.error ? COLOR.error : COLOR.secondary },
+            }, modeNote?.text ?? t('extra.emotionImmediate')),
+            h('span', { style: { fontSize: 12, color: COLOR.secondary } },
+              emotionMode === 'infer'
+                ? t('extra.emotionInferHint')
+                : emotionMode === 'marker'
+                  ? t('extra.emotionMarkerHint')
+                  : t('extra.emotionFixedHint')),
+            emotionMode === 'marker'
+              ? h('div', { style: { flexBasis: '100%', fontSize: 12, color: COLOR.secondary, lineHeight: '18px' } }, t('extra.emotionMarkerNote'))
+              : null),
+
+          row(t('label.previewText'),
+            h('input', {
+              className: 'dsh-breeze-control',
+              style: { flex: '1 1 180px', maxWidth: 420 },
+              'aria-label': t('label.previewText'),
+              value: previewText,
+              onChange: (event) => editSetting('previewText', event.target.value),
+            }),
+            h('button', {
+              type: 'button',
+              className: 'dsh-breeze-play',
+              onClick: preview,
+              disabled: phase !== 'idle',
+            }, phase === 'preview' ? Spinner(11) : PlayGlyph(11), h('span', null, t('label.preview'))),
+            notice ? h('span', { role: 'status', style: { flexBasis: '100%', fontSize: 12, color: COLOR.secondary } }, notice) : null),
 
           row(t('extra.publicVoices'),
             h('button', {
@@ -1488,125 +1676,28 @@ function cleanForSpeech(text, keepTags) {
                 }, voice.description || '')),
               h('button', {
                 type: 'button', className: 'dsh-breeze-btn',
+                disabled: phase !== 'idle',
                 onClick: () => audioPreview(voice.voiceId),
               }, t('label.preview')),
               h('button', {
                 type: 'button',
                 className: 'dsh-breeze-btn',
                 'data-primary': savedVoices.some((item) => item.voiceId === voice.voiceId) ? 'false' : 'true',
-                disabled: savedVoices.some((item) => item.voiceId === voice.voiceId),
+                disabled: phase !== 'idle' || savedVoices.some((item) => item.voiceId === voice.voiceId),
                 onClick: () => loadPublicVoice(voice),
               }, savedVoices.some((item) => item.voiceId === voice.voiceId) ? t('extra.voiceLoadedTag') : t('extra.loadVoice'))))),
             publicVoices.length ? null : h('div', { style: { fontSize: 12, color: COLOR.secondary } }, t('extra.libraryEmpty')))
             : null,
 
-          row(t('label.mood'),
-            h('select', {
-              className: 'dsh-breeze-control',
-              style: { maxWidth: 240 },
-              value: moodId,
-              onChange: (event) => setMoodId(event.target.value),
-            },
-            tones.map((tone) => h('option', { key: tone.id, value: tone.id },
-              (tone.builtin ? t('tone.' + tone.id) : tone.name)
-                + (tone.builtin ? '' : ' · ' + t('extra.customTag'))))),
-            h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: startNewTone }, t('extra.newTone')),
-            activeTone && !activeTone.builtin
-              ? h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: startEditTone }, t('extra.editTone'))
-              : null,
-            activeTone && !activeTone.builtin
-              ? h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: removeTone, disabled: phase === 'deleteTone' }, t('extra.deleteTone'))
-              : null),
-
-          activeTone
-            ? h('div', {
-              style: {
-                marginTop: -4, marginBottom: 6, fontSize: 12, lineHeight: '18px',
-                color: COLOR.secondary, paddingLeft: 144,
-              },
-            }, activeTone.instructions)
-            : null,
-
-          toneEditor
-            ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, margin: '4px 0 10px 144px' } },
-              h('input', {
-                className: 'dsh-breeze-control',
-                style: { maxWidth: 300 },
-                placeholder: t('extra.toneNamePlaceholder'),
-                value: toneDraftName,
-                onChange: (event) => setToneDraftName(event.target.value),
-              }),
-              h('textarea', {
-                className: 'dsh-breeze-control',
-                style: { minHeight: 62, padding: '8px 10px', resize: 'vertical', lineHeight: '20px' },
-                placeholder: t('extra.tonePlaceholder'),
-                maxLength: 500,
-                value: toneDraftText,
-                onChange: (event) => setToneDraftText(event.target.value),
-              }),
-              h('div', { style: { display: 'flex', gap: 8 } },
-                h('button', {
-                  type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
-                  onClick: saveTone, disabled: phase === 'saveTone',
-                }, phase === 'saveTone' ? Spinner(12) : t('extra.saveTone')),
-                h('button', { type: 'button', className: 'dsh-breeze-btn', onClick: cancelTone }, t('extra.cancel'))))
-            : null,
-
-          row(t('extra.emotionMode'),
-            h('select', {
-              className: 'dsh-breeze-control',
-              style: { maxWidth: 200 },
-              value: emotionMode,
-              onChange: async (event) => {
-                const next = event.target.value
-                setEmotionMode(next)
-                try {
-                  await api('/settings', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ emotionMode: next }),
-                  })
-                  setNotice(t('extra.emotionSaved'))
-                } catch (error) {
-                  setNotice(humanError(t, error))
-                }
-              },
-            },
-            h('option', { value: 'fixed' }, t('extra.emotionFixed')),
-            h('option', { value: 'infer' }, t('extra.emotionInfer')),
-            h('option', { value: 'marker' }, t('extra.emotionMarker'))),
-            h('span', { style: { fontSize: 12, color: COLOR.secondary } },
-              emotionMode === 'infer'
-                ? t('extra.emotionInferHint')
-                : emotionMode === 'marker'
-                  ? t('extra.emotionMarkerHint')
-                  : t('extra.emotionFixedHint')),
-            emotionMode === 'marker'
-              ? h('div', { style: { flexBasis: '100%', fontSize: 12, color: COLOR.error, lineHeight: '18px' } }, t('extra.emotionMarkerNote'))
-              : null),
-
-          row(t('label.previewText'),
-            h('input', {
-              className: 'dsh-breeze-control',
-              style: { flex: 1, minWidth: 220, maxWidth: 420 },
-              value: previewText,
-              onChange: (event) => setPreviewText(event.target.value),
-            }),
-            h('button', {
-              type: 'button',
-              className: 'dsh-breeze-play',
-              onClick: preview,
-              disabled: phase === 'preview',
-            }, phase === 'preview' ? Spinner(11) : PlayGlyph(11), h('span', null, t('label.preview')))),
-
           row(t('extra.autoSpeak'),
             h('button', {
               type: 'button',
               role: 'switch',
+              'aria-label': t('extra.autoSpeak'),
               'aria-checked': autoSpeak ? 'true' : 'false',
               className: 'dsh-breeze-switch',
               'data-on': autoSpeak ? 'true' : 'false',
-              onClick: () => setAutoSpeak(!autoSpeak),
+              onClick: () => editSetting('autoSpeak', !autoSpeak),
             }, h('span', { className: 'dsh-breeze-knob' })),
             h('span', { style: { fontSize: 12, color: COLOR.secondary } }, t('extra.autoSpeakHint'))),
 
@@ -1614,26 +1705,29 @@ function cleanForSpeech(text, keepTags) {
             h('button', {
               type: 'button',
               role: 'switch',
+              'aria-label': t('extra.backgroundPlay'),
               'aria-checked': backgroundPlay ? 'true' : 'false',
               className: 'dsh-breeze-switch',
               'data-on': backgroundPlay ? 'true' : 'false',
-              onClick: () => setBackgroundPlay(!backgroundPlay),
+              onClick: () => editSetting('backgroundPlay', !backgroundPlay),
             }, h('span', { className: 'dsh-breeze-knob' })),
             h('span', { style: { fontSize: 12, color: COLOR.secondary } }, t('extra.backgroundPlayHint'))),
 
           row(t('extra.autoMax'),
             h('input', {
               type: 'range', min: 0, max: 1000, step: 10,
+              'aria-label': t('extra.autoMax'),
               value: Math.min(1000, Math.max(0, Number(autoMax) || 0)),
-              onChange: (event) => setAutoMax(Number(event.target.value)),
+              onChange: (event) => editSetting('autoSpeakMaxChars', Number(event.target.value)),
               style: { flex: 1, minWidth: 160, maxWidth: 320, accentColor: COLOR.brand },
             }),
             h('input', {
               className: 'dsh-breeze-control',
               style: { width: 96 },
               type: 'number', min: 0, max: 99999, step: 1,
+              'aria-label': t('extra.autoMax'),
               value: autoMax,
-              onChange: (event) => setAutoMax(Math.max(0, Math.min(99999, Number(event.target.value) || 0))),
+              onChange: (event) => editSetting('autoSpeakMaxChars', Math.max(0, Math.min(99999, Number(event.target.value) || 0))),
             }),
             h('span', { style: { fontSize: 12, color: COLOR.secondary } }, t('status.chars')),
             h('span', { style: { fontSize: 12, color: COLOR.secondary } }, t('extra.autoMaxHint')),
@@ -1648,8 +1742,9 @@ function cleanForSpeech(text, keepTags) {
               className: 'dsh-breeze-control',
               style: { width: 110 },
               type: 'number', min: 100, step: 100,
+              'aria-label': t('label.dailyLimit'),
               value: dailyChars,
-              onChange: (event) => setDailyChars(event.target.value),
+              onChange: (event) => editSetting('dailyChars', event.target.value),
             }),
             h('span', { style: { fontSize: 12, color: COLOR.secondary } }, t('hint.limit'))),
 
@@ -1675,7 +1770,7 @@ function cleanForSpeech(text, keepTags) {
               type: 'button',
               className: 'dsh-breeze-btn',
               onClick: doRefresh,
-              disabled: phase === 'refresh',
+              disabled: !hasKey || phase !== 'idle',
             }, phase === 'refresh' ? Spinner(12) : t('label.refresh')),
             refreshNote.text
               ? h('span', {
@@ -1686,19 +1781,8 @@ function cleanForSpeech(text, keepTags) {
               }, refreshNote.text)
               : null)),
 
-        h('div', {
-          style: { marginTop: 14, fontSize: 12, lineHeight: '18px', color: COLOR.secondary },
-        }, t('extra.cloneNotice')),
-
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 } },
-          h('button', {
-            type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
-            onClick: save, disabled: phase === 'save',
-          }, phase === 'save' ? t('label.saving') : t('label.save')),
-          notice ? h('span', { style: { fontSize: 12, color: COLOR.secondary } }, notice) : null),
-        data && data.ok === false ? h('p', { className: 'dsh-breeze-hint' }, t('hint.key')) : null,
-
         sectionTitle(t('extra.designTitle')),
+        h('p', { className: 'dsh-breeze-hint' }, t('extra.cloneNotice')),
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 } },
           h('textarea', {
             className: 'dsh-breeze-control',
@@ -1726,10 +1810,11 @@ function cleanForSpeech(text, keepTags) {
             }),
             h('button', {
               type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
-              onClick: generate, disabled: phase === 'design' || designDesc.trim().length < 3,
+              onClick: generate, disabled: phase !== 'idle' || designDesc.trim().length < 3,
             }, phase === 'design' ? t('extra.generating') : t('extra.generate')),
             h('span', { style: { fontSize: 12, color: COLOR.secondary } }, t('extra.designCost'))),
           h('p', { className: 'dsh-breeze-hint', style: { margin: 0 } }, t('extra.designHint')),
+          designNote ? h('p', { className: 'dsh-breeze-hint', role: 'status' }, designNote) : null,
           candidates.length
             ? h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 } },
               candidates.map((candidate, index) => h('div', {
@@ -1749,9 +1834,17 @@ function cleanForSpeech(text, keepTags) {
                 h('button', {
                   type: 'button', className: 'dsh-breeze-btn', 'data-primary': 'true',
                   onClick: () => saveCandidate(candidate),
-                  disabled: phase === 'saveVoice',
+                  disabled: phase !== 'idle',
                 }, t('extra.saveVoice'))))))
-            : null))
+            : null),
+        h('div', { className: 'dsh-breeze-savebar' },
+          h('button', {
+            type: 'button', className: 'dsh-breeze-btn', 'data-primary': dirty ? 'true' : 'false',
+            onClick: save, disabled: !data || !dirty || phase !== 'idle',
+          }, phase === 'save' ? t('label.saving') : t('label.save')),
+          h('span', {
+            role: 'status', style: { fontSize: 12, color: saveNote?.error ? COLOR.error : COLOR.secondary },
+          }, saveNote?.error ? saveNote.text : dirty ? t('label.unsaved') : (saveNote?.text ?? ''))))
     }
 
     return {
@@ -1800,7 +1893,7 @@ function cleanForSpeech(text, keepTags) {
           locale: NS,
         }, (props) => h(AutoSpeakChip, Object.assign({}, props, { t }))))
       },
-      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip, SpeakButton, QuotaChip, speakRemotely },
+      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip, SpeakButton, QuotaChip, speakRemotely, SettingsPage },
     }
   },
 })

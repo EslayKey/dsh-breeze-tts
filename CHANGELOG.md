@@ -7,9 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ### Changed
 - Model-tagged replies use emoji Markdown markers in DSH. Both the new markup and legacy HTML comments are recognized for speech.
+- The settings page shows connection management on demand and keeps voice, tone, and preview controls together.
 
 ### Fixed
 - The chat quota indicator refreshes after speech synthesis and picks up tool usage without restarting DSH or querying the Breeze account balance.
+- Refreshing the balance and today's usage preserves unsaved settings. The save control stays visible and reports pending changes.
 
 ## [1.0.6] - 2026-11-15
 

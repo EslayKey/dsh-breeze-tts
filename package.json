@@ -1,6 +1,6 @@
 {
   "name": "@eslaykey/dsh-breeze-tts",
-  "version": "1.0.7-rc.1",
+  "version": "1.0.7-rc.3",
   "description": "Breeze Blue text-to-speech for DeepSeek Harness: agent tools, reply playback, voice design and a settings page.",
   "author": "eslaykey",
   "license": "MIT",
