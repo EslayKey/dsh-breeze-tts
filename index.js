@@ -321,8 +321,8 @@ export function apply(ctx, config) {
     }
   }
 
-  async function usage() {
-    const store = await readStore()
+  async function usage(store) {
+    store ??= await readStore()
     const today = usageKey()
     if (store.usageDate !== today) return { chars: 0, calls: 0 }
     return { chars: Number(store.usageChars ?? 0), calls: Number(store.usageCalls ?? 0) }
@@ -615,6 +615,17 @@ export function apply(ctx, config) {
             return parseJson(Buffer.concat(chunks).toString('utf8')) ?? {}
           }
           try {
+            if (route === '/usage' && req.method === 'GET') {
+              const s = await withStoreLock(settings)
+              const current = await usage(s)
+              res.setHeader('cache-control', 'no-store')
+              return json(200, {
+                chars: current.chars,
+                limit: Number(s.dailyChars ?? 0),
+                hasKey: Boolean(s.apiKey),
+                autoSpeak: Boolean(s.autoSpeak),
+              })
+            }
             if (route === '/status' && req.method === 'GET') {
               const s = await settings()
               const current = await usage()

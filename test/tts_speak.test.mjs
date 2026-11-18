@@ -64,9 +64,13 @@ globalThis.fetch = async (url, init = {}) => {
 const { apply } = await import('../index.js')
 
 const tools = new Map()
+let handleRoute
 const fakeCtx = {
   get(name) {
-    if (name === 'webServer') return { register: () => () => {} }
+    if (name === 'webServer') return { register(route) {
+      handleRoute = route.handler
+      return () => {}
+    } }
     return undefined
   },
   effect(fn) {
@@ -81,6 +85,17 @@ const fakeCtx = {
   },
 }
 apply(fakeCtx, {})
+
+async function getUsage() {
+  let payload
+  const res = {
+    setHeader(name, value) { assert.equal(name, 'cache-control'); assert.equal(value, 'no-store') },
+    writeHead(status) { assert.equal(status, 200) },
+    end(body) { payload = JSON.parse(body) },
+  }
+  await handleRoute({ method: 'GET', url: '/breeze-tts/usage' }, res)
+  return payload
+}
 
 const speak = tools.get('tts_speak')
 assert.ok(speak, 'tts_speak was not registered')
@@ -100,6 +115,7 @@ async function check(name, fn) {
 
 await check('two concurrent 8-character requests cannot both spend a 10-character budget', async () => {
   calls.length = 0
+  assert.deepEqual(await getUsage(), { chars: 0, limit: 10, hasKey: true, autoSpeak: false })
   const results = await Promise.allSettled([
     speak.execute({ text: '一二三四五六七八', play: false }),
     speak.execute({ text: 'abcdefgh', play: false }),
@@ -116,6 +132,12 @@ await check('two concurrent 8-character requests cannot both spend a 10-characte
 await check('the stored usage matches what was actually sent', async () => {
   const store = JSON.parse(await readFile(path.join(home, '.dsh', 'breeze.json'), 'utf8'))
   assert.equal(store.usageChars, 8)
+})
+
+await check('the quota route reflects tool usage without calling Breeze', async () => {
+  calls.length = 0
+  assert.deepEqual(await getUsage(), { chars: 8, limit: 10, hasKey: true, autoSpeak: false })
+  assert.equal(calls.length, 0)
 })
 
 await check('a request over the remaining budget is refused before the API call', async () => {

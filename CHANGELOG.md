@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [Unreleased]
 
+### Fixed
+- The chat quota indicator refreshes after speech synthesis and picks up tool usage without restarting DSH or querying the Breeze account balance.
+
 ## [1.0.6] - 2026-11-15
 
 ### Changed

@@ -252,21 +252,31 @@ window.__ModuleLoader__.load({
       idle: 'var(--dsw-alias-state-idle-primary)',
     }
 
+    const usageListeners = new Set()
+    const usageChangingRoutes = new Set(['/synth', '/settings', '/connect', '/disconnect'])
+
     async function api(route, options) {
-      const response = await fetch(ENDPOINT + route, options)
-      const type = response.headers.get('content-type') || ''
-      if (type.includes('application/json')) {
-        const data = await response.json()
-        if (!response.ok) {
-          const failure = new Error(data.error || `HTTP ${response.status}`)
-          failure.code = data.code || ''
-          failure.status = data.status || response.status
-          throw failure
+      try {
+        const response = await fetch(ENDPOINT + route, options)
+        const type = response.headers.get('content-type') || ''
+        if (type.includes('application/json')) {
+          const data = await response.json()
+          if (!response.ok) {
+            const failure = new Error(data.error || `HTTP ${response.status}`)
+            failure.code = data.code || ''
+            failure.status = data.status || response.status
+            throw failure
+          }
+          return data
         }
-        return data
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.blob()
+      } finally {
+        // Some segments can count towards usage even when synthesis fails.
+        if (options?.method === 'POST' && usageChangingRoutes.has(route)) {
+          for (const refresh of usageListeners) refresh()
+        }
       }
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      return response.blob()
     }
 
     function humanError(t, error) {
@@ -651,7 +661,6 @@ function cleanForSpeech(text, keepTags) {
 
     function AutoSpeakChip(props) {
       const t = props.t
-      const [state] = useStatus()
       const playedFor = (sessionId) => {
         const key = 'breeze-tts:spoken:' + (sessionId || 'global')
         let stored = null
@@ -876,14 +885,58 @@ function cleanForSpeech(text, keepTags) {
         return undefined
       }, [snapshot, tick])
 
-      const data = state.data
+      return h(QuotaChip, { t })
+    }
+
+    function QuotaChip({ t }) {
+      const [data, setData] = React.useState(null)
+      React.useEffect(() => {
+        let active = true
+        let loading = false
+        let queued = false
+        let timer
+
+        const refresh = async () => {
+          window.clearTimeout(timer)
+          if (!active || document.visibilityState === 'hidden') return
+          if (loading) {
+            queued = true
+            return
+          }
+
+          loading = true
+          queued = false
+          try {
+            const usage = await api('/usage', { cache: 'no-store', signal: AbortSignal.timeout(5000) })
+            if (active) setData(usage)
+          } catch {
+            // Keep the last count displayed and retry on the next refresh.
+          } finally {
+            loading = false
+            if (active && document.visibilityState !== 'hidden') {
+              if (queued) void refresh()
+              else timer = window.setTimeout(refresh, 5000)
+            }
+          }
+        }
+
+        usageListeners.add(refresh)
+        window.addEventListener('focus', refresh)
+        document.addEventListener('visibilitychange', refresh)
+        void refresh()
+        return () => {
+          active = false
+          window.clearTimeout(timer)
+          usageListeners.delete(refresh)
+          window.removeEventListener('focus', refresh)
+          document.removeEventListener('visibilitychange', refresh)
+        }
+      }, [])
+
       if (!data) return null
-      const used = data.today ? data.today.chars : 0
-      const limit = data.today ? data.today.limit : 0
-      const tone = data.ok ? COLOR.success : COLOR.error
-      const enabled = Boolean(data.autoSpeak)
-      const label = data.ok
-        ? `${used} / ${limit} ${t('status.chars')}${enabled ? ' · ' + t('extra.autoOn') : ''}`
+      const tone = data.hasKey ? COLOR.success : COLOR.error
+      const label = data.hasKey
+        ? `${data.chars} / ${data.limit} ${t('status.chars')}${data.autoSpeak ? ' · ' + t('extra.autoOn') : ''}`
         : t('status.missingKey')
 
       return h('div', {
@@ -1742,7 +1795,7 @@ function cleanForSpeech(text, keepTags) {
           locale: NS,
         }, (props) => h(AutoSpeakChip, Object.assign({}, props, { t }))))
       },
-      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip },
+      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip, QuotaChip, speakRemotely },
     }
   },
 })
