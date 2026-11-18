@@ -3,7 +3,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { buildPlan } from './plan.js'
+import { buildPlan, EMOTION_MARKERS } from './plan.js'
 
 const API_BASE = 'https://api.breeze.blue/v1'
 const ROUTE_PREFIX = '/breeze-tts'
@@ -456,13 +456,11 @@ export function apply(ctx, config) {
       text: () => {
         if (emotionModeCache !== 'marker') return ''
         return [
-          'Voice emotion tags: to make part of a reply speak with a different tone,',
-          'put an HTML comment tag at the start of that segment:',
-          '<!--mood:curious-->, <!--mood:excited-->, <!--mood:happy-->, <!--mood:angry-->,',
-          '<!--mood:down-->, <!--mood:sad-->, <!--mood:whisper-->, <!--mood:gentle-->,',
-          '<!--mood:surprised-->, <!--mood:afraid-->, <!--mood:serious-->, <!--mood:tired-->.',
-          'The tag only affects speech synthesis. Use them sparingly, only where the',
-          'emotional shift matters.',
+          'Voice emotion markers: put one of the exact Markdown markers below at the start',
+          'of a segment whose spoken tone should change. Keep its emoji and destination together.',
+          EMOTION_MARKERS.join(', ') + '.',
+          'Separate markers from nearby prose with spaces. Continue with the reply as normal prose.',
+          'Do not wrap markers in code, turn them into images, or use HTML comments. Use them sparingly.',
         ].join(' ')
       },
     }), 'breeze-tts: emotion prompt section')

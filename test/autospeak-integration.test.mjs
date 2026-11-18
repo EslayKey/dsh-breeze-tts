@@ -65,7 +65,7 @@ function render(component, props) {
   return tree
 }
 const reactShim = {
-  createElement: () => null,
+  createElement: (type, props, ...children) => ({ type, props, children }),
   useState(init) {
     const i = current.index++
     if (!(i in current.cells)) current.cells[i] = { value: typeof init === 'function' ? init() : init }
@@ -113,7 +113,7 @@ const plugin = globalThis.__captured.factory((name) => {
   if (name === 'react') return reactShim
   throw new Error('unexpected require: ' + name)
 })
-const { AutoSpeakChip } = plugin.__test
+const { AutoSpeakChip, SpeakButton } = plugin.__test
 assert.equal(typeof AutoSpeakChip, 'function')
 
 // --- scripted fetch -------------------------------------------------------
@@ -121,6 +121,7 @@ const calls = []
 let statusGate = null
 let playGate = null
 let synthFails = false
+let autoSpeakMaxChars = 999
 globalThis.fetch = async (url, init = {}) => {
   const target = String(url)
   calls.push({ url: target, method: (init.method || 'GET').toUpperCase(), body: init.body })
@@ -134,11 +135,11 @@ globalThis.fetch = async (url, init = {}) => {
   if (target.endsWith('/status')) {
     if (statusGate) {
       return new Promise((resolve, reject) => {
-        statusGate.resolve = () => resolve(json({ autoSpeak: true, autoSpeakMaxChars: 999, backgroundPlay: true }))
+        statusGate.resolve = () => resolve(json({ autoSpeak: true, autoSpeakMaxChars, backgroundPlay: true }))
         statusGate.reject = () => reject(new Error('status failed'))
       })
     }
-    return json({ autoSpeak: true, autoSpeakMaxChars: 999, backgroundPlay: true })
+    return json({ autoSpeak: true, autoSpeakMaxChars, backgroundPlay: true })
   }
   if (target.endsWith('/synth')) {
     if (synthFails) throw new Error('synth failed')
@@ -168,7 +169,7 @@ function makeView(options) {
         kind: 'assistant',
         messageId: options.id,
         turn: 7,
-        message: { content: [{ type: 'text', text: 'hello world' }] },
+        message: { content: [{ type: 'text', text: options.text ?? 'hello world' }] },
       }],
       turnEnds: new Map(options.turnEnded === false ? [] : [[7, 42]]),
       partial: options.partial,
@@ -328,6 +329,53 @@ await check('a session switch during /play writes nothing into the new session',
   assert.equal((s1.ids || []).includes('m12'), false, 'the switch made the result stale')
   assert.equal(calls.filter((c) => c.url.endsWith('/synth')).length, 1, 'no replay after the switch')
   playGate = null
+})
+
+await check('auto-speak preserves emoji tones without counting the markers against its threshold', async () => {
+  calls.length = 0
+  current = null
+  window.localStorage.store.clear()
+  store.sessionId = 'emoji'
+  store.view = makeView({ turnEnded: true, id: 'previous' })
+  draw()
+  await flush(0)
+  autoSpeakMaxChars = 'Hello. Quietly.'.length
+  try {
+    store.view = makeView({
+      turnEnded: true,
+      id: 'emoji-reply',
+      text: '[😄](breeze-mood:happy) Hello. [🤫](breeze-mood:whisper) Quietly.',
+    })
+    draw()
+    await flush(400)
+    const requests = calls.filter((call) => call.url.endsWith('/synth'))
+    assert.deepEqual(requests.map(({ body }) => JSON.parse(body).text), [
+      '<!--mood:happy--> Hello. <!--mood:whisper--> Quietly.',
+    ])
+  } finally {
+    autoSpeakMaxChars = 999
+  }
+})
+
+await check('manual speech keeps complete emoji markers and drops a marker cut by the preview limit', async () => {
+  calls.length = 0
+  current = null
+  globalThis.Audio = class { play() { return Promise.resolve() } }
+  const body = 'a'.repeat(579)
+  const view = makeView({
+    turnEnded: true,
+    id: 'manual-emoji',
+    text: '[😄](breeze-mood:happy) ' + body + ' [🤫](breeze-mood:whisper) Later.',
+  })
+  const button = render(SpeakButton, {
+    messageId: 'manual-emoji',
+    useChat: (selector) => selector(view),
+    t: (key) => key,
+  })
+  assert.equal(button.type, 'button')
+  await button.props.onClick()
+  const request = calls.find((call) => call.url.endsWith('/synth'))
+  assert.equal(JSON.parse(request.body).text, '<!--mood:happy--> ' + body + ' ')
 })
 
 console.log('\n' + passed + ' checks passed')

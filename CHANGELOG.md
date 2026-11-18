@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), version
 
 ## [Unreleased]
 
+### Changed
+- Model-tagged replies use emoji Markdown markers in DSH. Both the new markup and legacy HTML comments are recognized for speech.
+
 ### Fixed
 - The chat quota indicator refreshes after speech synthesis and picks up tool usage without restarting DSH or querying the Breeze account balance.
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildPlan, cleanSpeech, detectLanguage, buildPlan as plan } from '../plan.js'
+import { buildPlan, cleanSpeech, detectLanguage, EMOTION_MARKERS, buildPlan as plan } from '../plan.js'
 
 let passed = 0
 function check(name, fn) {
@@ -28,6 +28,33 @@ check('markers switch tone and never reach the spoken text', () => {
   const { segments } = plan('<!--mood:happy-->今天真开心！<!--mood:whisper-->小声说一句。', { emotionMode: 'marker' })
   assert.deepEqual(segments.map((s) => s.emotion), ['happy', 'whisper'])
   assert.deepEqual(segments.map((s) => s.text), ['今天真开心！', '小声说一句。'])
+})
+
+check('all published emoji markers produce the existing tone and cost', () => {
+  assert.equal(EMOTION_MARKERS.length, 12)
+  for (const marker of EMOTION_MARKERS) {
+    const id = /breeze-mood:([a-z]+)\)/.exec(marker)[1]
+    const modern = plan(marker + ' Hello world.', { emotionMode: 'marker' })
+    const legacy = plan('<!--mood:' + id + '-->Hello world.', { emotionMode: 'marker' })
+    assert.deepEqual(modern, legacy)
+    assert.equal(modern.chars, 12)
+    assert.equal(modern.segments[0].emotion, id)
+    assert.ok(modern.segments[0].instructions)
+  }
+})
+
+check('mixed marker formats preserve tones, text and language', () => {
+  const { segments, chars } = plan('[😄](breeze-mood:happy) Hello there. <!--mood:whisper-->小声说一句。', { emotionMode: 'marker' })
+  assert.deepEqual(segments.map((s) => [s.text, s.emotion, s.language]), [
+    ['Hello there.', 'happy', 'en'],
+    ['小声说一句。', 'whisper', 'zh'],
+  ])
+  assert.equal(chars, 18)
+})
+
+check('code examples and ordinary Markdown links cannot set the tone', () => {
+  const { segments } = plan('`[😄](breeze-mood:happy)` Hello [label](breeze-mood:angry).', { emotionMode: 'marker' })
+  assert.deepEqual(segments.map((s) => [s.text, s.emotion]), [['Hello label.', '']])
 })
 
 check('mixed languages split into per-language segments', () => {
@@ -67,7 +94,7 @@ check('infer mode assigns tone by punctuation', () => {
 })
 
 check('fixed mode keeps one tone and drops markers', () => {
-  const { segments } = plan('<!--mood:happy-->今天真开心！', { emotionMode: 'fixed' })
+  const { segments } = plan('[😄](breeze-mood:happy) 今天真开心！', { emotionMode: 'fixed' })
   assert.equal(segments.length, 1)
   assert.equal(segments[0].emotion, '')
   assert.equal(segments[0].text, '今天真开心！')

@@ -14,26 +14,36 @@ const SENTENCE_MARKS = [0x3002, 0xFF01, 0xFF1F, 0x2026, 0xFF1B, 0x21, 0x3F, 0x3B
   .join('')
 
 const MARKER_PATTERN = /<!--\s*mood:\s*([a-z-]+)\s*-->/gi
+const MARKDOWN_MARKER_PATTERN = /(?<![!\\])\[\p{Extended_Pictographic}\uFE0F?\]\(breeze-mood:([a-z-]+)\)/giu
+const CODE_PATTERN = /`{1,3}[^`]*`{1,3}/g
 
 export const DEFAULT_MAX_CHARS = 900
 
-const EMOTION_INSTRUCTIONS = {
-  curious: '语气带着好奇和疑问，句尾略微上扬。',
-  excited: '语气兴奋，语速稍快，音调偏高。',
-  happy: '语气愉快，带着笑意，句尾轻轻上扬。',
-  angry: '语气生气，音量略高，语速偏快，带着一点压迫感。',
-  down: '语气沮丧，声音发闷，语速放慢。',
-  sad: '语气低落，语速放慢，尾音下沉。',
-  whisper: '压低声音像耳语，气息多，音量小。',
-  surprised: '语气惊讶，语调突然抬高，语速略快。',
-  afraid: '语气带着紧张和不安，声音发抖，语速不稳。',
-  serious: '语气严肃克制，吐字清楚，节奏稳定。',
-  tired: '语气疲惫，声音有气无力，语速偏慢。',
-  gentle: '语气轻柔，像在轻声安慰对方。',
+const EMOTIONS = {
+  curious: ['🤔', '语气带着好奇和疑问，句尾略微上扬。'],
+  excited: ['🤩', '语气兴奋，语速稍快，音调偏高。'],
+  happy: ['😄', '语气愉快，带着笑意，句尾轻轻上扬。'],
+  angry: ['😠', '语气生气，音量略高，语速偏快，带着一点压迫感。'],
+  down: ['😞', '语气沮丧，声音发闷，语速放慢。'],
+  sad: ['😢', '语气低落，语速放慢，尾音下沉。'],
+  whisper: ['🤫', '压低声音像耳语，气息多，音量小。'],
+  surprised: ['😮', '语气惊讶，语调突然抬高，语速略快。'],
+  afraid: ['😨', '语气带着紧张和不安，声音发抖，语速不稳。'],
+  serious: ['😐', '语气严肃克制，吐字清楚，节奏稳定。'],
+  tired: ['😩', '语气疲惫，声音有气无力，语速偏慢。'],
+  gentle: ['😌', '语气轻柔，像在轻声安慰对方。'],
 }
 
+export const EMOTION_MARKERS = Object.entries(EMOTIONS)
+  .map(([emotion, [emoji]]) => '[' + emoji + '](breeze-mood:' + emotion + ')')
+
 export function emotionInstruction(emotion) {
-  return EMOTION_INSTRUCTIONS[String(emotion || '').toLowerCase()] || ''
+  const id = String(emotion || '').toLowerCase()
+  return Object.hasOwn(EMOTIONS, id) ? EMOTIONS[id][1] : ''
+}
+
+function normalizeMarkers(text) {
+  return String(text ?? '').replace(MARKDOWN_MARKER_PATTERN, '<!--mood:$1-->')
 }
 
 function countMatches(text, pattern) {
@@ -54,7 +64,7 @@ export function stripEmoji(text) {
 }
 
 export function cleanSpeech(text, keepTags) {
-  let value = String(text ?? '')
+  let value = normalizeMarkers(text)
   const tags = []
   if (keepTags) {
     value = value.replace(/<!--[\s\S]*?-->/g, (match) => {
@@ -67,7 +77,7 @@ export function cleanSpeech(text, keepTags) {
   value = value.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
   value = value.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
   value = value.replace(/https?:\/\/[^\s)]+/g, ' ')
-  value = value.replace(/`{1,3}[^`]*`{1,3}/g, ' ')
+  value = value.replace(CODE_PATTERN, ' ')
   value = value.replace(/[*_~#>|]+/g, ' ')
   value = stripEmoji(value)
   value = value.replace(/\s+([：，。！？；、）】」》])/g, '$1')
@@ -109,17 +119,15 @@ export function splitSentences(text) {
 
 /** Split one text into emotion-tagged units; a leading marker applies to what follows. */
 export function splitByMarker(text) {
-  const value = String(text ?? '')
+  const value = normalizeMarkers(String(text ?? '').replace(CODE_PATTERN, ' '))
   const parts = []
   let lastIndex = 0
   let current = ''
-  let match = MARKER_PATTERN.exec(value)
-  while (match) {
+  for (const match of value.matchAll(MARKER_PATTERN)) {
     const before = value.slice(lastIndex, match.index)
     if (before.trim()) parts.push({ text: before, emotion: current })
     current = String(match[1] || '').toLowerCase()
     lastIndex = match.index + match[0].length
-    match = MARKER_PATTERN.exec(value)
   }
   const tail = value.slice(lastIndex)
   if (tail.trim()) parts.push({ text: tail, emotion: current })
@@ -180,13 +188,9 @@ export function buildPlan(text, options = {}) {
     baseInstructions = '',
     maxChars = DEFAULT_MAX_CHARS,
   } = options
-  const raw = String(text ?? '')
-  const markerMode = emotionMode === 'marker' && MARKER_PATTERN.test(raw)
-  MARKER_PATTERN.lastIndex = 0
-
-  const units = markerMode
-    ? splitByMarker(raw)
-    : [{ text: cleanSpeech(raw), emotion: '' }]
+  const units = emotionMode === 'marker'
+    ? splitByMarker(text)
+    : [{ text, emotion: '' }]
 
   const pieces = []
   let carry = ''

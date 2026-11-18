@@ -57,7 +57,10 @@ globalThis.fetch = async (url, init = {}) => {
     status: 200,
     async text() { return '' },
     async json() { return {} },
-    async arrayBuffer() { return makeWav().buffer.slice(0, makeWav().length) },
+    async arrayBuffer() {
+      const audio = makeWav()
+      return audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength)
+    },
   }
 }
 
@@ -65,10 +68,15 @@ const { apply } = await import('../index.js')
 
 const tools = new Map()
 let handleRoute
+let emotionPrompt
 const fakeCtx = {
   get(name) {
     if (name === 'webServer') return { register(route) {
       handleRoute = route.handler
+      return () => {}
+    } }
+    if (name === 'systemPrompt') return { section(section) {
+      emotionPrompt = section.text
       return () => {}
     } }
     return undefined
@@ -225,6 +233,50 @@ await check('the builtin warm tone is used when asked for', async () => {
   const tts = calls.filter((c) => c.url.includes('/text-to-speech/'))
   assert.ok(tts[0].body.instructions && tts[0].body.instructions.length > 4)
   assert.equal(out.mood, 'warm')
+})
+
+await check('model tagging emits emoji markers and synthesis uses the same cache and quota as legacy tags', async () => {
+  assert.equal(emotionPrompt(), '')
+  const res = {
+    writeHead(status) { assert.equal(status, 200) },
+    end() {},
+  }
+  await handleRoute({
+    method: 'POST',
+    url: '/breeze-tts/settings',
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(JSON.stringify({ emotionMode: 'marker' }))
+    },
+  }, res)
+  const prompt = emotionPrompt()
+  assert.equal((prompt.match(/breeze-mood:/g) || []).length, 12)
+  assert.ok(prompt.includes('[😄](breeze-mood:happy)'))
+  assert.ok(prompt.includes('[🤫](breeze-mood:whisper)'))
+  assert.equal(prompt.includes('<!--mood:'), false)
+
+  calls.length = 0
+  const before = await getUsage()
+  const reply = await speak.execute({
+    text: '[😄](breeze-mood:happy) Hello there. [🤫](breeze-mood:whisper) 小声说一句。',
+    play: false,
+  })
+  const sent = calls.filter((call) => call.url.includes('/text-to-speech/')).map((call) => call.body)
+  assert.deepEqual(sent.map((body) => [body.text, body.language_code]), [
+    ['Hello there.', 'en'],
+    ['小声说一句。', 'zh'],
+  ])
+  assert.match(sent[0].instructions, /愉快/)
+  assert.match(sent[1].instructions, /耳语/)
+  assert.equal(reply.chars, 18)
+  assert.equal((await getUsage()).chars, before.chars + 18)
+
+  const legacy = await speak.execute({
+    text: '<!--mood:happy-->Hello there. <!--mood:whisper-->小声说一句。',
+    play: false,
+  })
+  assert.equal(legacy.chars, 0)
+  assert.equal(calls.length, 2, 'the legacy spelling should hit the same cache')
+  assert.equal((await getUsage()).chars, before.chars + 18)
 })
 
 console.log('\n' + passed + ' checks passed')

@@ -59,8 +59,8 @@ window.__ModuleLoader__.load({
           emotionMarker: '模型标注',
           emotionFixedHint: '全程使用上面选中的语气朗读，不做任何切换',
           emotionInferHint: '按标点自动切换：问号→好奇、感叹号→兴奋、省略号→失落；分段变多会拖慢生成',
-          emotionMarkerHint: '由模型在回复里插入标记，指定某一段的语气；分段变多会拖慢生成',
-          emotionMarkerNote: '模型标注为实验性功能：由模型自行标注语气，可能出现标记显形或判断偏差。',
+          emotionMarkerHint: '回复中的表情标记指定接下来一段的朗读语气。分段越多，合成越慢。',
+          emotionMarkerNote: '模型标注是实验功能。模型可能漏标、选错语气或输出不完整的标记。',
           publicVoices: '公开音色',
           publicVoicesHint: '插件默认只显示你自建的音色，公共目录另外浏览',
           openLibrary: '更多公开音色',
@@ -163,8 +163,8 @@ window.__ModuleLoader__.load({
           emotionMarker: 'Model tagged',
           emotionFixedHint: 'Speak everything with the tone selected above, no switching',
           emotionInferHint: 'Switch by punctuation: question → curious, exclamation → excited, ellipsis → sad; more segments means slower synthesis',
-          emotionMarkerHint: 'The model inserts markers to pick the tone per segment; more segments means slower synthesis',
-          emotionMarkerNote: 'Model tagging is experimental: the model tags its own tone. Markers may appear in the text or be misjudged.',
+          emotionMarkerHint: 'Emoji markers in the reply select the spoken tone for the next segment. More segments take longer to synthesize.',
+          emotionMarkerNote: 'Model tagging is experimental. The model may omit a marker, pick the wrong tone, or emit an incomplete marker.',
           publicVoices: 'Public voices',
           publicVoicesHint: 'Only your own voices are listed by default; the public catalog is browsed separately',
           openLibrary: 'Browse public voices',
@@ -491,7 +491,9 @@ function stripEmoji(text) {
 }
 
 function cleanForSpeech(text, keepTags) {
+  // Convert Markdown markers before stripping links and emoji from the speech text.
   let value = String(text ?? '')
+    .replace(/(?<![!\\])\[\p{Extended_Pictographic}\uFE0F?\]\(breeze-mood:([a-z-]+)\)/giu, '<!--mood:$1-->')
   const tags = []
   if (keepTags) {
     value = value.replace(/<!--[\s\S]*?-->/g, (match) => {
@@ -536,10 +538,9 @@ function cleanForSpeech(text, keepTags) {
       if (!target) return ""
       const message = target.message && typeof target.message === "object" ? target.message : target
       const direct = textBlocks(message.content, [])
-      if (direct.length) return cleanForSpeech(direct.join(String.fromCharCode(10)), true)
-      const typed = collectText(message, [], 0).join(String.fromCharCode(10)).trim()
-      if (typed) return typed
-      return collectAnyText(message, [], 0).join(String.fromCharCode(10)).trim()
+      const typed = direct.length ? direct : collectText(message, [], 0)
+      const blocks = typed.length ? typed : collectAnyText(message, [], 0)
+      return cleanForSpeech(blocks.join('\n'), true)
     }
 
     /**
@@ -634,7 +635,11 @@ function cleanForSpeech(text, keepTags) {
       const speak = async () => {
         setPhase('busy')
         try {
-          const data = await speakRemotely({ text: text.slice(0, 600) })
+          const limit = 600
+          const markerStart = text.lastIndexOf('<!--', limit - 1)
+          const cut = markerStart >= 0 && text.indexOf('-->', markerStart) + 3 > limit
+            ? markerStart : limit
+          const data = await speakRemotely({ text: text.slice(0, cut) })
           setPhase('playing')
           const wait = Math.max(1200, Number(data.chars || 0) * 260)
           window.setTimeout(() => setPhase('idle'), wait)
@@ -1795,7 +1800,7 @@ function cleanForSpeech(text, keepTags) {
           locale: NS,
         }, (props) => h(AutoSpeakChip, Object.assign({}, props, { t }))))
       },
-      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip, QuotaChip, speakRemotely },
+      __test: { decideAutoSpeak, createTurnTimer, AutoSpeakChip, SpeakButton, QuotaChip, speakRemotely },
     }
   },
 })

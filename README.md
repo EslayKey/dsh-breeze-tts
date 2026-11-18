@@ -56,6 +56,8 @@ API key 在这里申请：<https://breezeblue.ai/app/developer/api-keys>
 - `dailyChars`：**硬闸门**，当天合成字数超了就拒绝，防止额度意外消耗
 - `autoSpeakMaxChars`：只有不超过这个字数的回复才会被自动朗读
 
+「模型标注」会让模型在需要变换语气的段落前插入 Markdown 表情标记，例如 `[😄](breeze-mood:happy)`。在 DSH 聊天里它显示为 😄，朗读时插件按标记选择语气，只合成正文。历史回复中的 `<!--mood:happy-->` 仍可朗读。
+
 ## 费用
 
 按字符计费，10 个计费单位 = 1 credit，中日韩字符算 2 个单位。实测约 **0.19 credits / 汉字**。
